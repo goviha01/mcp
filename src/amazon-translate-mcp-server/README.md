@@ -134,7 +134,7 @@ The server performs comprehensive configuration validation at startup:
 
 Use the included `validate-config.py` script to test your configuration before starting the server.
 
-See [ENVIRONMENT.md](ENVIRONMENT.md) for complete configuration options.
+See the Environment Variables section above for complete configuration options.
 
 ## MCP Client Setup
 
@@ -159,18 +159,17 @@ Add to your Claude Desktop configuration file:
 
 ### Other MCP Clients
 
-See [MCP_CLIENT_CONFIG.md](MCP_CLIENT_CONFIG.md) for configuration examples for:
+For other MCP clients, use similar configuration patterns:
 - VS Code with MCP extension
 - Custom MCP implementations
 - Development environments
 
-## Documentation
+Refer to your MCP client's documentation for specific configuration syntax.
 
-- **[Deployment Guide](DEPLOYMENT.md)** - Complete deployment instructions for various environments
-- **[Environment Variables](ENVIRONMENT.md)** - Configuration options and environment variables
-- **[MCP Client Configuration](MCP_CLIENT_CONFIG.md)** - Setup examples for popular MCP clients
-- **🆕 [Workflow Features](WORKFLOW_FEATURES.md)** - Detailed guide to intelligent workflow orchestration
-- **[Changelog](CHANGELOG.md)** - Version history and changes
+## Additional Resources
+
+- **🆕 Workflow Features** - See WORKFLOW_FEATURES.md for detailed guide to intelligent workflow orchestration
+- **Changelog** - See CHANGELOG.md for version history and changes
 
 ## Architecture Overview
 
@@ -256,7 +255,7 @@ The health check returns detailed status information for each component, helping
    - Validate input text encoding and format
    - Ensure file extensions are allowed
 
-For more troubleshooting information, see the [Deployment Guide](DEPLOYMENT.md).
+For additional troubleshooting, check the AWS documentation and ensure your IAM permissions are correctly configured.
 
 ## Development and Testing
 
@@ -303,7 +302,7 @@ python -m awslabs.amazon_translate_mcp_server.server
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines on:
+We welcome contributions! Please see the main repository's contributing guidelines for:
 
 - Reporting bugs and feature requests
 - Setting up the development environment
@@ -312,7 +311,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](../../CONTRIBUTING.md) fo
 
 ## License
 
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache License 2.0.
 
 ## Support
 

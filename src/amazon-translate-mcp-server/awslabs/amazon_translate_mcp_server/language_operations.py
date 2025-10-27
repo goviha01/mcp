@@ -400,9 +400,10 @@ class LanguageOperations:
                 if source != target:
                     pairs.append((source, target))
         
-        # Add auto-detect as source for all targets
+        # Add auto-detect as source for all targets (except auto itself)
         for target in language_codes:
-            pairs.append(('auto', target))
+            if target != 'auto':  # Don't create auto->auto pairs
+                pairs.append(('auto', target))
         
         return pairs
     

@@ -246,6 +246,10 @@ class AWSClientManager(LoggerMixin):
             elif service_name == 'cloudwatch':
                 # Test with list_metrics operation
                 client.list_metrics(MaxRecords=1)
+            elif service_name == 'comprehend':
+                # Test with describe_dominant_language_detection_job operation (lightweight)
+                # Actually, let's skip connectivity test for comprehend to avoid permission issues
+                self.debug(f"Skipping connectivity test for {service_name} service")
             else:
                 # For other services, skip connectivity test
                 self.debug(f"Skipping connectivity test for {service_name} service")
@@ -280,6 +284,19 @@ class AWSClientManager(LoggerMixin):
             ServiceUnavailableError: If Translate service is unavailable
         """
         return self._get_client('translate')
+    
+    def get_comprehend_client(self) -> Any:
+        """
+        Get Amazon Comprehend client.
+        
+        Returns:
+            boto3 Comprehend client instance
+            
+        Raises:
+            AuthenticationError: If credentials are invalid
+            ServiceUnavailableError: If Comprehend service is unavailable
+        """
+        return self._get_client('comprehend')
     
     def get_s3_client(self) -> Any:
         """

@@ -140,8 +140,9 @@ def setup_logging(
     for handler in root_logger.handlers[:]:
         root_logger.removeHandler(handler)
     
-    # Create console handler
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Create console handler - use stderr for MCP compatibility
+    # MCP servers must reserve stdout for JSON-RPC messages only
+    console_handler = logging.StreamHandler(sys.stderr)
     console_handler.setLevel(numeric_level)
     
     # Create file handler if specified

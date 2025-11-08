@@ -244,8 +244,8 @@ class AWSClientManager(LoggerMixin):
                 # Test with list_buckets operation
                 client.list_buckets()
             elif service_name == 'cloudwatch':
-                # Test with list_metrics operation
-                client.list_metrics(MaxRecords=1)
+                # Test with list_metrics operation (no parameters needed)
+                client.list_metrics()
             elif service_name == 'comprehend':
                 # Test with describe_dominant_language_detection_job operation (lightweight)
                 # Actually, let's skip connectivity test for comprehend to avoid permission issues

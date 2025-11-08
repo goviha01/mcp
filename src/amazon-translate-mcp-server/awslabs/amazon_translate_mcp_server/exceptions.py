@@ -220,6 +220,11 @@ class QuotaExceededError(TranslateException):
         if quota_limit is not None:
             details['quota_limit'] = quota_limit
         super().__init__(message, error_code, details, **kwargs)
+        
+        # Store as attributes for backward compatibility with tests
+        self.quota_type = quota_type
+        self.current_usage = current_usage
+        self.quota_limit = quota_limit
 
 
 class ServiceUnavailableError(TranslateException):
@@ -241,6 +246,9 @@ class ServiceUnavailableError(TranslateException):
         if service_name:
             details['service_name'] = service_name
         super().__init__(message, error_code, details, **kwargs)
+        
+        # Store as attribute for backward compatibility with tests
+        self.service = service_name
 
 
 class ConfigurationError(TranslateException):

@@ -21,7 +21,7 @@ error handling, and retry logic.
 """
 
 import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import Mock, MagicMock, patch, call
 from botocore.exceptions import ClientError, BotoCoreError
 import time
 
@@ -124,16 +124,16 @@ class TestTranslationService:
         """Test text translation with automatic language detection."""
         translate_client = mock_aws_client_manager.get_translate_client.return_value
         
-        # Mock language detection response
+        # Mock language detection response (using dummy translation for detection)
         detect_response = {
-            'Languages': [
-                {'LanguageCode': 'en', 'Score': 0.95},
-                {'LanguageCode': 'fr', 'Score': 0.05}
-            ]
+            'TranslatedText': 'Hello world',
+            'SourceLanguageCode': 'en',
+            'TargetLanguageCode': 'en',
+            'AppliedTerminologies': [],
+            'AppliedSettings': {}
         }
-        translate_client.detect_dominant_language.return_value = detect_response
         
-        # Mock translation response
+        # Mock actual translation response
         translate_response = {
             'TranslatedText': 'Hola mundo',
             'SourceLanguageCode': 'en',
@@ -141,7 +141,9 @@ class TestTranslationService:
             'AppliedTerminologies': [],
             'AppliedSettings': {}
         }
-        translate_client.translate_text.return_value = translate_response
+        
+        # Set up side_effect to return different responses for different calls
+        translate_client.translate_text.side_effect = [detect_response, translate_response]
         
         # Execute translation with auto-detection
         result = translation_service.translate_text(
@@ -150,15 +152,12 @@ class TestTranslationService:
             target_language="es"
         )
         
-        # Verify language detection was called
-        translate_client.detect_dominant_language.assert_called_once_with(Text="Hello world")
-        
-        # Verify translation was called with detected language
-        translate_client.translate_text.assert_called_once_with(
-            Text="Hello world",
-            SourceLanguageCode="en",
-            TargetLanguageCode="es"
-        )
+        # Verify language detection was called (first call with auto->en for detection)
+        expected_calls = [
+            call(Text="Hello world", SourceLanguageCode="auto", TargetLanguageCode="en"),
+            call(Text="Hello world", SourceLanguageCode="en", TargetLanguageCode="es")
+        ]
+        translate_client.translate_text.assert_has_calls(expected_calls)
         
         # Verify result
         assert result.source_language == "en"
@@ -201,17 +200,17 @@ class TestTranslationService:
     
     def test_detect_language_success(self, translation_service, mock_aws_client_manager):
         """Test successful language detection."""
-        # Mock detection response
+        # Mock detection response (using dummy translation for detection)
         mock_response = {
-            'Languages': [
-                {'LanguageCode': 'en', 'Score': 0.95},
-                {'LanguageCode': 'fr', 'Score': 0.03},
-                {'LanguageCode': 'de', 'Score': 0.02}
-            ]
+            'TranslatedText': 'Hello world',
+            'SourceLanguageCode': 'en',
+            'TargetLanguageCode': 'en',
+            'AppliedTerminologies': [],
+            'AppliedSettings': {}
         }
         
         translate_client = mock_aws_client_manager.get_translate_client.return_value
-        translate_client.detect_dominant_language.return_value = mock_response
+        translate_client.translate_text.return_value = mock_response
         
         # Execute detection
         result = translation_service.detect_language("Hello world")
@@ -220,12 +219,12 @@ class TestTranslationService:
         assert isinstance(result, LanguageDetectionResult)
         assert result.detected_language == "en"
         assert result.confidence_score == 0.95
-        assert len(result.alternative_languages) == 2
-        assert result.alternative_languages[0] == ("fr", 0.03)
-        assert result.alternative_languages[1] == ("de", 0.02)
+        assert len(result.alternative_languages) == 0  # No alternatives from translate method
         
-        # Verify API call
-        translate_client.detect_dominant_language.assert_called_once_with(Text="Hello world")
+        # Verify API call (using dummy translation for detection)
+        translate_client.translate_text.assert_called_once_with(
+            Text="Hello world", SourceLanguageCode="auto", TargetLanguageCode="en"
+        )
     
     def test_detect_language_validation_errors(self, translation_service):
         """Test language detection input validation errors."""
@@ -242,17 +241,23 @@ class TestTranslationService:
     
     def test_detect_language_no_languages_detected(self, translation_service, mock_aws_client_manager):
         """Test language detection when no languages are detected."""
-        # Mock empty response
-        mock_response = {'Languages': []}
+        # Mock response without SourceLanguageCode
+        mock_response = {
+            'TranslatedText': 'Hello world',
+            'TargetLanguageCode': 'en',
+            'AppliedTerminologies': [],
+            'AppliedSettings': {}
+            # Missing SourceLanguageCode to simulate detection failure
+        }
         
         translate_client = mock_aws_client_manager.get_translate_client.return_value
-        translate_client.detect_dominant_language.return_value = mock_response
+        translate_client.translate_text.return_value = mock_response
         
         # Execute detection
         with pytest.raises(TranslationError) as exc_info:
             translation_service.detect_language("Hello world")
         
-        assert "No languages detected" in str(exc_info.value)
+        assert "No source language detected" in str(exc_info.value)
     
     def test_validate_translation_success(self, translation_service):
         """Test successful translation validation."""

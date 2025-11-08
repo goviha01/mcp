@@ -81,6 +81,7 @@ class BatchTranslationWorkflowResult:
     pre_validation_results: Dict[str, Any] = field(default_factory=dict)
     monitoring_history: List[Dict[str, Any]] = field(default_factory=list)
     performance_metrics: Optional[Dict[str, Any]] = None
+    error_analysis: Optional[Dict[str, Any]] = None
     created_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
     total_execution_time: Optional[float] = None
@@ -126,7 +127,206 @@ class WorkflowOrchestrator:
         self._active_workflows: Dict[str, WorkflowContext] = {}
         self._workflow_results: Dict[str, Any] = {}
         
-        logger.info("Workflow orchestrator initialized successfully") 
+        logger.info("Workflow orchestrator initialized successfully")
+    
+    async def _analyze_job_errors(
+        self, 
+        job_id: str, 
+        output_s3_uri: str, 
+        loop: asyncio.AbstractEventLoop
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Analyze failed batch translation job by checking S3 details folder for error information.
+        
+        Args:
+            job_id: The failed job ID
+            output_s3_uri: Output S3 URI where details folder should be
+            loop: Event loop for async execution
+            
+        Returns:
+            Dictionary with error analysis and suggested actions, or None if no errors found
+        """
+        try:
+            logger.info(f"Analyzing errors for failed job {job_id}")
+            
+            # Parse S3 URI to get bucket and prefix
+            s3_parts = output_s3_uri.replace("s3://", "").split("/", 1)
+            bucket_name = s3_parts[0]
+            output_prefix = s3_parts[1] if len(s3_parts) > 1 else ""
+            
+            # Get S3 client first
+            s3_client = self.batch_manager.s3_client
+            
+            # Look for details folder in the output location
+            # AWS Translate creates folders with format: {account_id}-TranslateText-{job_id}/
+            # First, find the actual job folder by searching for the job_id pattern
+            job_folder_prefix = f"{output_prefix}"
+            
+            # List folders to find the one containing our job_id
+            def list_job_folders():
+                return s3_client.list_objects_v2(
+                    Bucket=bucket_name,
+                    Prefix=job_folder_prefix,
+                    Delimiter='/'
+                )
+            
+            folders_response = await loop.run_in_executor(None, list_job_folders)
+            
+            job_folder = None
+            if 'CommonPrefixes' in folders_response:
+                for prefix_info in folders_response['CommonPrefixes']:
+                    folder_name = prefix_info['Prefix']
+                    if job_id in folder_name:
+                        job_folder = folder_name
+                        break
+            
+            if not job_folder:
+                logger.warning(f"Could not find job folder for job_id {job_id} in {job_folder_prefix}")
+                return None
+            
+            details_prefix = f"{job_folder}details/"
+            
+            logger.debug(f"Checking for error details in s3://{bucket_name}/{details_prefix}")
+            
+            def list_error_files():
+                return s3_client.list_objects_v2(
+                    Bucket=bucket_name,
+                    Prefix=details_prefix
+                )
+            
+            response = await loop.run_in_executor(None, list_error_files)
+            
+            if 'Contents' not in response:
+                logger.warning(f"No error details found in s3://{bucket_name}/{details_prefix}")
+                return None
+            
+            error_analysis = {
+                "job_id": job_id,
+                "error_files_found": [],
+                "error_details": [],
+                "suggested_actions": []
+            }
+            
+            # Process each error file
+            for obj in response['Contents']:
+                if obj['Key'].endswith('.json'):
+                    logger.debug(f"Reading error file: {obj['Key']}")
+                    
+                    # Download and parse error file
+                    def get_error_file():
+                        return s3_client.get_object(
+                            Bucket=bucket_name,
+                            Key=obj['Key']
+                        )
+                    
+                    error_content = await loop.run_in_executor(None, get_error_file)
+                    
+                    error_text = error_content['Body'].read().decode('utf-8')
+                    
+                    try:
+                        import json
+                        error_data = json.loads(error_text)
+                        
+                        error_analysis["error_files_found"].append(obj['Key'])
+                        error_analysis["error_details"].append({
+                            "file": obj['Key'],
+                            "error_data": error_data
+                        })
+                        
+                        # Analyze error and suggest actions
+                        suggestions = self._generate_error_suggestions(error_data)
+                        error_analysis["suggested_actions"].extend(suggestions)
+                        
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse error file {obj['Key']}: {e}")
+                        error_analysis["error_details"].append({
+                            "file": obj['Key'],
+                            "raw_content": error_text,
+                            "parse_error": str(e)
+                        })
+            
+            logger.info(f"Error analysis completed for job {job_id}: found {len(error_analysis['error_files_found'])} error files")
+            return error_analysis
+            
+        except Exception as e:
+            logger.error(f"Failed to analyze job errors for {job_id}: {e}")
+            return {
+                "job_id": job_id,
+                "analysis_error": str(e),
+                "suggested_actions": [
+                    "Check AWS CloudWatch logs for the translation job",
+                    "Verify S3 bucket permissions and access",
+                    "Ensure input files are in supported format"
+                ]
+            }
+    
+    def _generate_error_suggestions(self, error_data: Dict[str, Any]) -> List[str]:
+        """
+        Generate actionable suggestions based on error data.
+        
+        Args:
+            error_data: Parsed error data from S3 details file
+            
+        Returns:
+            List of suggested actions to resolve the error
+        """
+        suggestions = []
+        
+        # Convert error data to string for analysis
+        error_str = str(error_data).lower()
+        
+        # Common error patterns and suggestions
+        if "utf-8" in error_str or "encoding" in error_str:
+            suggestions.extend([
+                "Check file encoding - ensure all files use UTF-8 encoding",
+                "Convert files to UTF-8 format before uploading",
+                "Remove or replace non-UTF-8 characters in input files"
+            ])
+        
+        if "unsupported" in error_str and "format" in error_str:
+            suggestions.extend([
+                "Convert input files to supported format (txt, html, docx, pptx, xlsx)",
+                "Check file encoding - use UTF-8 encoding",
+                "Verify file is not corrupted or empty"
+            ])
+        
+        if "permission" in error_str or "access" in error_str:
+            suggestions.extend([
+                "Check IAM role has s3:GetObject permission for input bucket",
+                "Check IAM role has s3:PutObject permission for output bucket",
+                "Verify the IAM role trust policy allows translate.amazonaws.com"
+            ])
+        
+        if "language" in error_str and ("unsupported" in error_str or "invalid" in error_str):
+            suggestions.extend([
+                "Verify source language is supported by Amazon Translate",
+                "Check target languages are valid language codes",
+                "Ensure language pair combination is supported"
+            ])
+        
+        if "size" in error_str or "limit" in error_str:
+            suggestions.extend([
+                "Reduce file size - maximum 20MB per file",
+                "Split large documents into smaller files",
+                "Check total job size doesn't exceed limits"
+            ])
+        
+        if "terminology" in error_str:
+            suggestions.extend([
+                "Verify custom terminology exists and is active",
+                "Check terminology supports the language pair",
+                "Ensure terminology format is correct"
+            ])
+        
+        if not suggestions:
+            suggestions.extend([
+                "Check AWS CloudWatch logs for detailed error information",
+                "Verify input file format and content",
+                "Ensure all AWS service permissions are correctly configured",
+                "Contact AWS Support if the issue persists"
+            ])
+        
+        return suggestions 
    
     async def smart_translate_workflow(
         self,
@@ -306,6 +506,11 @@ class WorkflowOrchestrator:
             
             return result
             
+        except (ValidationError, TranslationError) as e:
+            # Re-raise validation and translation errors as-is
+            context.error_count += 1
+            logger.error(f"Smart translation workflow {workflow_id} failed at step {context.current_step}: {e}")
+            raise
         except Exception as e:
             context.error_count += 1
             logger.error(f"Smart translation workflow {workflow_id} failed at step {context.current_step}: {e}")
@@ -481,23 +686,17 @@ class WorkflowOrchestrator:
             context.completed_steps.append("start_batch_job")
             context.metadata["job_id"] = job_id
             
-            # Step 4: Monitor Job Progress
+            # Step 4: Monitor Job Progress Until Completion
             context.current_step = "monitor_job_progress"
-            logger.debug(f"Step 4: Monitoring job progress for workflow {workflow_id}")
+            logger.info(f"Step 4: Monitoring job progress for workflow {workflow_id} until completion")
             
             monitoring_history = []
             job_status = None
             monitoring_start = time.time()
             
+            # Monitor continuously until job reaches final state
             while True:
                 current_time = time.time()
-                
-                # Check monitoring duration limit
-                if current_time - monitoring_start > max_monitoring_duration:
-                    logger.warning(
-                        f"Monitoring duration exceeded {max_monitoring_duration}s for workflow {workflow_id}"
-                    )
-                    break
                 
                 # Get job status
                 job_status = await loop.run_in_executor(
@@ -515,19 +714,43 @@ class WorkflowOrchestrator:
                 }
                 monitoring_history.append(monitoring_entry)
                 
-                logger.debug(
+                logger.info(
                     f"Job {job_id} status: {job_status.status}, "
-                    f"progress: {job_status.progress}%"
+                    f"progress: {job_status.progress}%, "
+                    f"elapsed: {current_time - monitoring_start:.1f}s"
                 )
                 
-                # Check if job is complete
+                # Check if job reached final state
                 if job_status.status in ["COMPLETED", "FAILED", "STOPPED"]:
+                    logger.info(f"Job {job_id} reached final state: {job_status.status}")
+                    break
+                
+                # Check if we've exceeded maximum monitoring duration
+                if current_time - monitoring_start > max_monitoring_duration:
+                    logger.warning(
+                        f"Monitoring duration exceeded {max_monitoring_duration}s for workflow {workflow_id}. "
+                        f"Job {job_id} is still {job_status.status}. Stopping monitoring but job continues."
+                    )
                     break
                 
                 # Wait before next check
                 await asyncio.sleep(monitor_interval)
             
             context.completed_steps.append("monitor_job_progress")
+            
+            # Step 4.5: Analyze Errors if Job Failed
+            error_analysis = None
+            if job_status and job_status.status == "FAILED":
+                context.current_step = "analyze_job_errors"
+                logger.info(f"Step 4.5: Analyzing job errors for failed job {job_id}")
+                
+                error_analysis = await self._analyze_job_errors(
+                    job_id, output_s3_uri, loop
+                )
+                
+                if error_analysis:
+                    logger.error(f"Job {job_id} failed with errors: {error_analysis}")
+                    context.completed_steps.append("analyze_job_errors")
             
             # Step 5: Collect Performance Metrics
             context.current_step = "collect_metrics"
@@ -581,6 +804,7 @@ class WorkflowOrchestrator:
                 pre_validation_results=validation_results,
                 monitoring_history=monitoring_history,
                 performance_metrics=performance_metrics,
+                error_analysis=error_analysis,
                 created_at=job_status.created_at if job_status else None,
                 completed_at=job_status.completed_at if job_status else None,
                 total_execution_time=total_execution_time,
@@ -597,6 +821,13 @@ class WorkflowOrchestrator:
             
             return result
             
+        except (ValidationError, BatchJobError) as e:
+            # Re-raise validation and batch job errors as-is
+            context.error_count += 1
+            logger.error(
+                f"Managed batch translation workflow {workflow_id} failed at step {context.current_step}: {e}"
+            )
+            raise
         except Exception as e:
             context.error_count += 1
             logger.error(

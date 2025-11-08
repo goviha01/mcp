@@ -296,7 +296,7 @@ class TestTerminologyManager:
         expected_call = mock_client.import_terminology.call_args
         assert expected_call[1]['EncryptionKey'] == {
             'Type': 'KMS',
-            'Id': 'kms'
+            'Id': 'arn:123456789012:key/12345678-1234-1234-1234-123456789012'
         }
     
     def test_create_terminology_validation_errors(self, terminology_manager):
@@ -367,7 +367,7 @@ class TestTerminologyManager:
         
         mock_response = {
             'TerminologyProperties': {
-                'Arn': 'imported-csv'
+                'Arn': 'arn:123456789012:terminology/imported-csv'
             }
         }
         mock_client.import_terminology.return_value = mock_response

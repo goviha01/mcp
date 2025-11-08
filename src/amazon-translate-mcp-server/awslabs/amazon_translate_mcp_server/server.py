@@ -10,6 +10,7 @@ terminology management, and language operations.
 import asyncio
 import logging
 import sys
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -153,6 +154,36 @@ class ManagedBatchTranslationWorkflowParams(BaseModel):
     content_type: str = Field(default="text/plain", description="Content type of input documents")
     monitor_interval: int = Field(default=30, description="Monitoring interval in seconds")
     max_monitoring_duration: int = Field(default=3600, description="Maximum monitoring duration in seconds")
+
+
+# Separate Batch Translation Tool Parameters
+
+class TriggerBatchTranslationParams(BaseModel):
+    """Parameters for trigger_batch_translation tool."""
+    input_s3_uri: str = Field(..., description="S3 URI for input documents")
+    output_s3_uri: str = Field(..., description="S3 URI for output location")
+    data_access_role_arn: str = Field(..., description="IAM role ARN for S3 access")
+    job_name: str = Field(..., description="Name for the translation job")
+    source_language: str = Field(..., description="Source language code")
+    target_languages: List[str] = Field(..., description="List of target language codes")
+    terminology_names: Optional[List[str]] = Field(
+        default=None, description="List of custom terminology names to apply"
+    )
+    content_type: str = Field(default="text/plain", description="Content type of input documents")
+
+
+class MonitorBatchTranslationParams(BaseModel):
+    """Parameters for monitor_batch_translation tool."""
+    job_id: str = Field(..., description="Translation job ID to monitor")
+    output_s3_uri: str = Field(..., description="S3 URI for output location (for error analysis)")
+    monitor_interval: int = Field(default=30, description="Monitoring interval in seconds")
+    max_monitoring_duration: int = Field(default=3600, description="Maximum monitoring duration in seconds")
+
+
+class AnalyzeBatchTranslationErrorsParams(BaseModel):
+    """Parameters for analyze_batch_translation_errors tool."""
+    job_id: str = Field(..., description="Failed translation job ID to analyze")
+    output_s3_uri: str = Field(..., description="S3 URI for output location where error details are stored")
 
 
 # Global service instances
@@ -374,7 +405,7 @@ async def get_translation_job(params: GetTranslationJobParams) -> Dict[str, Any]
         return {
             "job_id": job_status.job_id,
             "job_name": job_status.job_name,
-            "status": job_status.status.value,
+            "status": job_status.status,
             "progress": job_status.progress,
             "input_config": {
                 "s3_uri": job_status.input_config.s3_uri if job_status.input_config else None,
@@ -418,9 +449,9 @@ async def list_translation_jobs(params: ListTranslationJobsParams) -> Dict[str, 
             job_list.append({
                 "job_id": job.job_id,
                 "job_name": job.job_name,
-                "status": job.status.value,
-                "source_language": job.source_language,
-                "target_languages": job.target_languages,
+                "status": job.status,
+                "source_language": job.source_language_code,
+                "target_languages": job.target_language_codes,
                 "created_at": job.created_at.isoformat() if job.created_at else None,
                 "completed_at": job.completed_at.isoformat() if job.completed_at else None
             })
@@ -493,14 +524,6 @@ async def create_terminology(params: CreateTerminologyParams) -> Dict[str, Any]:
         # Import the required models
         from .models import TerminologyData
         
-        # Create terminology data object
-        terminology_data = TerminologyData(
-            format="CSV",
-            file_content=b"",  # Will be populated from terms
-            source_language=params.source_language,
-            target_languages=params.target_languages
-        )
-        
         # Convert terms to CSV format
         csv_content = "source,target\n"
         for term in params.terms:
@@ -508,7 +531,11 @@ async def create_terminology(params: CreateTerminologyParams) -> Dict[str, Any]:
             target = term.get("target", "")
             csv_content += f'"{source}","{target}"\n'
         
-        terminology_data.file_content = csv_content.encode('utf-8')
+        # Create terminology data object
+        terminology_data = TerminologyData(
+            terminology_data=csv_content.encode('utf-8'),
+            format="CSV"
+        )
         
         # Run synchronous method in thread pool
         loop = asyncio.get_event_loop()
@@ -684,9 +711,7 @@ async def get_language_metrics(params: GetLanguageMetricsParams) -> Dict[str, An
             "translation_count": metrics.translation_count,
             "character_count": metrics.character_count,
             "average_response_time": metrics.average_response_time,
-            "success_rate": metrics.success_rate,
-            "error_rate": metrics.error_rate,
-            "cost_estimate": metrics.cost_estimate
+            "error_rate": metrics.error_rate
         }
         
     except Exception as e:
@@ -805,6 +830,333 @@ async def managed_batch_translation_workflow(params: ManagedBatchTranslationWork
         
     except Exception as e:
         logger.error(f"Managed batch translation workflow failed: {e}")
+        return {"error": str(e), "error_type": type(e).__name__}
+
+
+# Separate Batch Translation Tools
+
+@mcp.tool()
+async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Dict[str, Any]:
+    """
+    Trigger a batch translation job without monitoring.
+    
+    This tool starts a batch translation job and returns immediately with the job ID.
+    Use this when you want to start a job and monitor it separately.
+    
+    Returns:
+    - job_id: The unique identifier for the translation job
+    - job_name: The name of the job
+    - status: Initial job status (typically SUBMITTED)
+    - validation_results: Pre-validation results for language pairs and terminologies
+    """
+    try:
+        if not workflow_orchestrator:
+            raise WorkflowError("Workflow orchestrator not initialized")
+        
+        if not batch_manager:
+            raise BatchJobError("Batch manager not initialized")
+        
+        # Pre-validate language pairs
+        loop = asyncio.get_event_loop()
+        language_pairs = await loop.run_in_executor(
+            None,
+            language_operations.list_language_pairs
+        )
+        
+        validation_results = {"supported_pairs": [], "unsupported_pairs": []}
+        
+        for target_lang in params.target_languages:
+            pair_supported = any(
+                pair.source_language == params.source_language and pair.target_language == target_lang
+                for pair in language_pairs
+            )
+            
+            if pair_supported:
+                validation_results["supported_pairs"].append(f"{params.source_language}->{target_lang}")
+            else:
+                validation_results["unsupported_pairs"].append(f"{params.source_language}->{target_lang}")
+        
+        if validation_results["unsupported_pairs"]:
+            raise ValidationError(
+                f"Unsupported language pairs: {validation_results['unsupported_pairs']}",
+                details=validation_results
+            )
+        
+        # Validate terminologies if provided
+        if params.terminology_names:
+            terminologies_result = await loop.run_in_executor(
+                None,
+                terminology_manager.list_terminologies
+            )
+            available_terminologies = [t.name for t in terminologies_result.get('terminologies', [])]
+            
+            missing_terminologies = [
+                name for name in params.terminology_names 
+                if name not in available_terminologies
+            ]
+            
+            if missing_terminologies:
+                raise ValidationError(
+                    f"Missing terminologies: {missing_terminologies}",
+                    details={"missing": missing_terminologies, "available": available_terminologies}
+                )
+            
+            validation_results["terminologies"] = {
+                "requested": params.terminology_names,
+                "available": available_terminologies,
+                "validated": True
+            }
+        
+        # Create configuration objects
+        from .models import BatchInputConfig, BatchOutputConfig, JobConfig
+        
+        input_config = BatchInputConfig(
+            s3_uri=params.input_s3_uri,
+            content_type=params.content_type,
+            data_access_role_arn=params.data_access_role_arn
+        )
+        
+        output_config = BatchOutputConfig(
+            s3_uri=params.output_s3_uri,
+            data_access_role_arn=params.data_access_role_arn
+        )
+        
+        job_config = JobConfig(
+            job_name=params.job_name,
+            source_language_code=params.source_language,
+            target_language_codes=params.target_languages,
+            terminology_names=params.terminology_names or []
+        )
+        
+        # Start the batch translation job
+        job_id = await loop.run_in_executor(
+            None,
+            batch_manager.start_batch_translation,
+            input_config,
+            output_config,
+            job_config
+        )
+        
+        # Get initial job status
+        job_status = await loop.run_in_executor(
+            None,
+            batch_manager.get_translation_job,
+            job_id
+        )
+        
+        return {
+            "job_id": job_id,
+            "job_name": params.job_name,
+            "status": job_status.status,
+            "source_language": params.source_language,
+            "target_languages": params.target_languages,
+            "input_s3_uri": params.input_s3_uri,
+            "output_s3_uri": params.output_s3_uri,
+            "terminology_names": params.terminology_names or [],
+            "validation_results": validation_results,
+            "created_at": job_status.created_at.isoformat() if job_status.created_at else None,
+            "message": "Batch translation job started successfully. Use monitor_batch_translation to track progress."
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to trigger batch translation: {e}")
+        return {"error": str(e), "error_type": type(e).__name__}
+
+
+@mcp.tool()
+async def monitor_batch_translation(params: MonitorBatchTranslationParams) -> Dict[str, Any]:
+    """
+    Monitor a batch translation job until completion or failure.
+    
+    This tool continuously monitors a batch translation job and returns when it reaches
+    a final state (COMPLETED, FAILED, or STOPPED). It provides progress updates and
+    performs error analysis if the job fails.
+    
+    Returns:
+    - job_id: The translation job ID
+    - final_status: The final status of the job
+    - monitoring_history: Complete history of status checks and progress
+    - performance_metrics: Performance and timing metrics
+    - error_analysis: Detailed error analysis if the job failed (includes S3 error details)
+    """
+    try:
+        if not batch_manager:
+            raise BatchJobError("Batch manager not initialized")
+        
+        if not workflow_orchestrator:
+            raise WorkflowError("Workflow orchestrator not initialized")
+        
+        loop = asyncio.get_event_loop()
+        monitoring_history = []
+        start_time = time.time()
+        
+        logger.info(f"Starting monitoring for job {params.job_id}")
+        
+        # Monitor continuously until job reaches final state
+        while True:
+            current_time = time.time()
+            
+            # Get job status
+            job_status = await loop.run_in_executor(
+                None,
+                batch_manager.get_translation_job,
+                params.job_id
+            )
+            
+            # Record monitoring data
+            monitoring_entry = {
+                "timestamp": datetime.now().isoformat(),
+                "status": job_status.status,
+                "progress": job_status.progress,
+                "elapsed_time": current_time - start_time
+            }
+            monitoring_history.append(monitoring_entry)
+            
+            logger.info(
+                f"Job {params.job_id} status: {job_status.status}, "
+                f"progress: {job_status.progress}%, "
+                f"elapsed: {current_time - start_time:.1f}s"
+            )
+            
+            # Check if job reached final state
+            if job_status.status in ["COMPLETED", "FAILED", "STOPPED"]:
+                logger.info(f"Job {params.job_id} reached final state: {job_status.status}")
+                break
+            
+            # Check if we've exceeded maximum monitoring duration
+            if current_time - start_time > params.max_monitoring_duration:
+                logger.warning(
+                    f"Monitoring duration exceeded {params.max_monitoring_duration}s for job {params.job_id}. "
+                    f"Job is still {job_status.status}. Stopping monitoring but job continues."
+                )
+                break
+            
+            # Wait before next check
+            await asyncio.sleep(params.monitor_interval)
+        
+        # Analyze errors if job failed
+        error_analysis = None
+        if job_status and job_status.status == "FAILED":
+            logger.info(f"Analyzing errors for failed job {params.job_id}")
+            
+            error_analysis = await workflow_orchestrator._analyze_job_errors(
+                params.job_id, params.output_s3_uri, loop
+            )
+        
+        # Calculate performance metrics
+        total_monitoring_time = time.time() - start_time
+        performance_metrics = {
+            "total_monitoring_time": total_monitoring_time,
+            "monitoring_checks": len(monitoring_history),
+            "final_status": job_status.status if job_status else "UNKNOWN",
+            "average_check_interval": total_monitoring_time / len(monitoring_history) if monitoring_history else 0
+        }
+        
+        return {
+            "job_id": params.job_id,
+            "final_status": job_status.status if job_status else "UNKNOWN",
+            "progress": job_status.progress if job_status else None,
+            "monitoring_history": monitoring_history,
+            "performance_metrics": performance_metrics,
+            "error_analysis": error_analysis,
+            "created_at": job_status.created_at.isoformat() if job_status and job_status.created_at else None,
+            "completed_at": job_status.completed_at.isoformat() if job_status and job_status.completed_at else None,
+            "message": f"Job monitoring completed. Final status: {job_status.status if job_status else 'UNKNOWN'}"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to monitor batch translation: {e}")
+        return {"error": str(e), "error_type": type(e).__name__}
+
+
+@mcp.tool()
+async def analyze_batch_translation_errors(params: AnalyzeBatchTranslationErrorsParams) -> Dict[str, Any]:
+    """
+    Analyze errors from a failed batch translation job.
+    
+    This tool examines the S3 output location for error detail files and provides
+    comprehensive error analysis with actionable suggestions for resolution.
+    
+    Returns:
+    - job_id: The failed job ID
+    - error_files_found: List of error detail files discovered
+    - error_details: Parsed error information from detail files
+    - suggested_actions: Actionable suggestions to resolve the errors
+    - error_summary: Summary of error patterns and root causes
+    """
+    try:
+        if not workflow_orchestrator:
+            raise WorkflowError("Workflow orchestrator not initialized")
+        
+        loop = asyncio.get_event_loop()
+        
+        logger.info(f"Analyzing errors for job {params.job_id}")
+        
+        # Perform error analysis
+        error_analysis = await workflow_orchestrator._analyze_job_errors(
+            params.job_id, params.output_s3_uri, loop
+        )
+        
+        if not error_analysis:
+            return {
+                "job_id": params.job_id,
+                "error": "No error details found for this job",
+                "message": "Either the job didn't fail, or error details are not yet available in S3"
+            }
+        
+        # Generate error summary
+        error_summary = {
+            "total_error_files": len(error_analysis.get("error_files_found", [])),
+            "error_patterns": [],
+            "affected_languages": [],
+            "root_causes": []
+        }
+        
+        # Analyze error patterns
+        for detail in error_analysis.get("error_details", []):
+            if "error_data" in detail:
+                error_data = detail["error_data"]
+                
+                # Track affected languages
+                source_lang = error_data.get("sourceLanguageCode")
+                target_lang = error_data.get("targetLanguageCode")
+                if source_lang and target_lang:
+                    lang_pair = f"{source_lang}->{target_lang}"
+                    if lang_pair not in error_summary["affected_languages"]:
+                        error_summary["affected_languages"].append(lang_pair)
+                
+                # Analyze file-level errors
+                if "details" in error_data:
+                    for file_detail in error_data["details"]:
+                        aux_data = file_detail.get("auxiliaryData", {})
+                        if "error" in aux_data:
+                            error_info = aux_data["error"]
+                            error_code = error_info.get("errorCode", "Unknown")
+                            error_message = error_info.get("errorMessage", "")
+                            
+                            # Categorize error patterns
+                            if "utf-8" in error_message.lower():
+                                if "UTF-8 Encoding Error" not in error_summary["error_patterns"]:
+                                    error_summary["error_patterns"].append("UTF-8 Encoding Error")
+                                    error_summary["root_causes"].append("Invalid file encoding or unsupported file format")
+                            
+                            if "format" in error_message.lower():
+                                if "Unsupported Format" not in error_summary["error_patterns"]:
+                                    error_summary["error_patterns"].append("Unsupported Format")
+                                    error_summary["root_causes"].append("File format not supported by Amazon Translate")
+        
+        return {
+            "job_id": params.job_id,
+            "error_files_found": error_analysis.get("error_files_found", []),
+            "error_details": error_analysis.get("error_details", []),
+            "suggested_actions": error_analysis.get("suggested_actions", []),
+            "error_summary": error_summary,
+            "analysis_timestamp": datetime.now().isoformat(),
+            "message": "Error analysis completed successfully"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to analyze batch translation errors: {e}")
         return {"error": str(e), "error_type": type(e).__name__}
 
 

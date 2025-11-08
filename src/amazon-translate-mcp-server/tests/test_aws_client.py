@@ -243,7 +243,7 @@ class TestAWSClientManager:
         client = manager.get_cloudwatch_client()
         
         assert client == mock_cw_client
-        mock_cw_client.list_metrics.assert_called_once_with(MaxRecords=1)
+        mock_cw_client.list_metrics.assert_called_once_with()
     
     def test_client_caching(self, mock_session, mock_sts_client, clean_env):
         """Test that clients are cached properly."""

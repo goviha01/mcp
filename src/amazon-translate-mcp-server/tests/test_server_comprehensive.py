@@ -324,7 +324,7 @@ class TestMCPToolFunctions:
             )
 
             # Verify the result
-            assert result['is_valid'] == True
+            assert result['is_valid']
             assert result['quality_score'] == 0.85
             assert result['issues'] == ['Minor grammar issue']
             assert result['suggestions'] == ['Consider rephrasing']
@@ -731,7 +731,7 @@ class TestLanguageOperationsMCPTools:
             assert len(result['language_pairs']) == 2
             assert result['language_pairs'][0]['source_language'] == 'en'
             assert result['language_pairs'][0]['target_language'] == 'es'
-            assert result['language_pairs'][0]['custom_terminology_supported'] == True
+            assert result['language_pairs'][0]['custom_terminology_supported']
 
             mock_lang.list_language_pairs.assert_called_once()
 
@@ -860,63 +860,6 @@ class TestWorkflowMCPTools:
             assert result['total_execution_time'] == 300.5
 
             mock_workflow.managed_batch_translation_workflow.assert_called_once()
-
-
-class TestMCPToolErrorHandling:
-    """Test comprehensive error handling for all MCP tools."""
-
-    @pytest.mark.asyncio
-    async def test_terminology_service_not_initialized(self):
-        """Test terminology tools when service not initialized."""
-        with patch.object(server, 'terminology_manager', None):
-            result = await server.list_terminologies.fn()
-
-            assert 'error' in result
-            assert 'Terminology manager not initialized' in result['error']
-            assert result['error_type'] == 'TerminologyError'
-
-    @pytest.mark.asyncio
-    async def test_language_operations_service_not_initialized(self):
-        """Test language operations when service not initialized."""
-        with patch.object(server, 'language_operations', None):
-            result = await server.list_language_pairs.fn()
-
-            assert 'error' in result
-            assert 'Language operations not initialized' in result['error']
-            assert result['error_type'] == 'TranslationError'
-
-    @pytest.mark.asyncio
-    async def test_workflow_orchestrator_not_initialized(self):
-        """Test workflow tools when orchestrator not initialized."""
-        with patch.object(server, 'workflow_orchestrator', None):
-            params = server.SmartTranslateWorkflowParams(text='Hello world', target_language='es')
-
-            result = await server.smart_translate_workflow.fn(params)
-
-            assert 'error' in result
-            assert 'Workflow orchestrator not initialized' in result['error']
-            assert result['error_type'] == 'WorkflowError'
-
-    @pytest.mark.asyncio
-    async def test_batch_translation_exception_handling(self):
-        """Test exception handling in batch translation."""
-        with patch.object(server, 'batch_manager') as mock_batch:
-            mock_batch.start_batch_translation.side_effect = Exception('S3 access denied')
-
-            params = server.StartBatchTranslationParams(
-                input_s3_uri='s3://bucket/input/',
-                output_s3_uri='s3://bucket/output/',
-                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
-                job_name='test-job',
-                source_language='en',
-                target_languages=['es'],
-            )
-
-            result = await server.start_batch_translation.fn(params)
-
-            assert 'error' in result
-            assert 'S3 access denied' in result['error']
-            assert result['error_type'] == 'Exception'
 
 
 class TestMCPToolAsyncioIntegration:

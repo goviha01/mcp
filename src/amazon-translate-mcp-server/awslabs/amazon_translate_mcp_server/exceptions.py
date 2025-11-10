@@ -1,3 +1,17 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Custom exception hierarchy for Amazon Translate MCP Server.
 
 This module defines a comprehensive exception hierarchy that provides structured
@@ -46,6 +60,16 @@ class TranslateException(Exception):
         retry_after: Optional[int] = None,
         correlation_id: Optional[str] = None,
     ):
+        """Initialize the base exception.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            details: Additional error details
+            retry_after: Seconds to wait before retry
+            correlation_id: Request correlation ID
+
+        """
         super().__init__(message)
         self.message = message
         self.error_code = error_code
@@ -81,6 +105,15 @@ class AuthenticationError(TranslateException):
         details: Optional[Dict[str, Any]] = None,
         **kwargs,
     ):
+        """Initialize the authentication error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            details: Additional error details
+            **kwargs: Additional keyword arguments
+
+        """
         super().__init__(message, error_code, details, **kwargs)
 
 
@@ -99,6 +132,15 @@ class ValidationError(TranslateException):
         field_errors: Optional[Dict[str, str]] = None,
         **kwargs,
     ):
+        """Initialize the validation error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            field_errors: Field-specific validation errors
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         if field_errors:
             details['field_errors'] = field_errors
@@ -120,6 +162,16 @@ class TranslationError(TranslateException):
         target_language: Optional[str] = None,
         **kwargs,
     ):
+        """Initialize the translation error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            source_language: Source language code
+            target_language: Target language code
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         if source_language:
             details['source_language'] = source_language
@@ -142,6 +194,15 @@ class TerminologyError(TranslateException):
         terminology_name: Optional[str] = None,
         **kwargs,
     ):
+        """Initialize the terminology error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            terminology_name: Name of the terminology
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         if terminology_name:
             details['terminology_name'] = terminology_name
@@ -163,6 +224,16 @@ class BatchJobError(TranslateException):
         job_status: Optional[str] = None,
         **kwargs,
     ):
+        """Initialize the batch job error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            job_id: Batch job identifier
+            job_status: Current job status
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         if job_id:
             details['job_id'] = job_id
@@ -181,6 +252,15 @@ class RateLimitError(TranslateException):
     def __init__(
         self, message: str, retry_after: int, error_code: str = 'RATE_LIMIT_ERROR', **kwargs
     ):
+        """Initialize the rate limit error.
+
+        Args:
+            message: Error message
+            retry_after: Seconds to wait before retry
+            error_code: Error code for categorization
+            **kwargs: Additional keyword arguments
+
+        """
         super().__init__(message, error_code, retry_after=retry_after, **kwargs)
 
 
@@ -200,6 +280,17 @@ class QuotaExceededError(TranslateException):
         quota_limit: Optional[int] = None,
         **kwargs,
     ):
+        """Initialize the quota exceeded error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            quota_type: Type of quota exceeded
+            current_usage: Current usage amount
+            quota_limit: Quota limit
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         if quota_type:
             details['quota_type'] = quota_type
@@ -229,6 +320,15 @@ class ServiceUnavailableError(TranslateException):
         service_name: Optional[str] = None,
         **kwargs,
     ):
+        """Initialize the service unavailable error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            service_name: Name of the unavailable service
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         if service_name:
             details['service_name'] = service_name
@@ -252,6 +352,15 @@ class ConfigurationError(TranslateException):
         config_key: Optional[str] = None,
         **kwargs,
     ):
+        """Initialize the configuration error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            config_key: Configuration key that caused the error
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         if config_key:
             details['config_key'] = config_key
@@ -272,6 +381,16 @@ class TimeoutError(TranslateException):
         operation: Optional[str] = None,
         **kwargs,
     ):
+        """Initialize the timeout error.
+
+        Args:
+            message: Error message
+            timeout_seconds: Timeout duration in seconds
+            error_code: Error code for categorization
+            operation: Operation that timed out
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         details['timeout_seconds'] = timeout_seconds
         if operation:
@@ -293,6 +412,15 @@ class SecurityError(TranslateException):
         security_type: Optional[str] = None,
         **kwargs,
     ):
+        """Initialize the security error.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            security_type: Type of security violation
+            **kwargs: Additional keyword arguments
+
+        """
         details = kwargs.pop('details', {})
         if security_type:
             details['security_type'] = security_type
@@ -411,6 +539,15 @@ class WorkflowError(TranslateException):
         workflow_step: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
     ):
+        """Initialize the workflow error.
+
+        Args:
+            message: Error message
+            workflow_id: Workflow identifier
+            workflow_step: Current workflow step
+            details: Additional error details
+
+        """
         details = details or {}
         if workflow_id:
             details['workflow_id'] = workflow_id

@@ -31,7 +31,7 @@ class TestServerToolsExecution:
 
     @pytest.fixture(autouse=True)
     def setup_services(self):
-        """Setup mock services for all tests."""
+        """Set up mock services for all tests."""
         with (
             patch.object(server, 'translation_service') as mock_trans,
             patch.object(server, 'secure_translation_service') as mock_secure,
@@ -471,7 +471,7 @@ class TestWorkflowTools:
 
     @pytest.fixture(autouse=True)
     def setup_workflow_services(self):
-        """Setup mock workflow services."""
+        """Set up mock workflow services."""
         with patch.object(server, 'workflow_orchestrator') as mock_workflow:
             self.mock_workflow = mock_workflow
             yield
@@ -582,7 +582,7 @@ class TestSeparateBatchTools:
 
     @pytest.fixture(autouse=True)
     def setup_batch_services(self):
-        """Setup mock services for batch tools."""
+        """Set up mock services for batch tools."""
         with (
             patch.object(server, 'workflow_orchestrator') as mock_workflow,
             patch.object(server, 'batch_manager') as mock_batch,
@@ -680,7 +680,7 @@ class TestSeparateBatchTools:
 
         with (
             patch('asyncio.get_event_loop') as mock_loop,
-            patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep,
+            patch('asyncio.sleep', new_callable=AsyncMock),
         ):
             mock_executor = AsyncMock()
             mock_executor.side_effect = job_statuses
@@ -738,12 +738,12 @@ class TestHealthCheckAndUtilities:
         """Test health check when all services are healthy."""
         with (
             patch.object(server, 'aws_client_manager') as mock_aws,
-            patch.object(server, 'translation_service') as mock_trans,
-            patch.object(server, 'batch_manager') as mock_batch,
-            patch.object(server, 'terminology_manager') as mock_term,
-            patch.object(server, 'language_operations') as mock_lang,
-            patch.object(server, 'secure_translation_service') as mock_secure,
-            patch.object(server, 'workflow_orchestrator') as mock_workflow,
+            patch.object(server, 'translation_service'),
+            patch.object(server, 'batch_manager'),
+            patch.object(server, 'terminology_manager'),
+            patch.object(server, 'language_operations'),
+            patch.object(server, 'secure_translation_service'),
+            patch.object(server, 'workflow_orchestrator'),
         ):
             # Mock successful credential validation
             mock_aws.validate_credentials.return_value = None

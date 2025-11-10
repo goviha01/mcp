@@ -181,7 +181,7 @@ class TestAWSClientManager:
         """Test successful credential validation."""
         mock_session.client.return_value = mock_sts_client
 
-        manager = AWSClientManager()
+        AWSClientManager()
 
         # Validation should have been called during initialization
         mock_sts_client.get_caller_identity.assert_called_once()

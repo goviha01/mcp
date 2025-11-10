@@ -1,3 +1,17 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Security-integrated Translation Service for Amazon Translate MCP Server.
 
 This module demonstrates how to integrate security features into translation services,
@@ -358,10 +372,11 @@ class SecurityIntegrationExample:
     """Example class showing various security integration patterns."""
 
     def __init__(self):
+        """Initialize the security integration example."""
         self.secure_service = SecureTranslationService()
 
     def example_secure_translation_workflow(self):
-        """Example of a complete secure translation workflow."""
+        """Demonstrate a complete secure translation workflow."""
         try:
             # Example 1: Basic secure translation
             text = 'Hello, my email is john.doe@example.com'
@@ -400,7 +415,7 @@ class SecurityIntegrationExample:
             print(f'Translation error: {e.message}')
 
     def example_batch_security_integration(self):
-        """Example of how to integrate security with batch operations."""
+        """Integrate security with batch operations."""
         # This would be integrated into the batch manager
         texts = [
             'Hello world',

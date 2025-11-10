@@ -1,3 +1,17 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Configuration management for Amazon Translate MCP Server.
 
 This module handles environment variable configuration, security settings,
@@ -97,7 +111,7 @@ def load_config_from_env() -> ServerConfig:
     def parse_set(value: Optional[str], default: Set[str]) -> Set[str]:
         if value is None:
             return default
-        return set(ext.strip() for ext in value.split(',') if ext.strip())
+        return {ext.strip() for ext in value.split(',') if ext.strip()}
 
     # Helper function to parse list of strings
     def parse_list(value: Optional[str], default: List[str]) -> List[str]:

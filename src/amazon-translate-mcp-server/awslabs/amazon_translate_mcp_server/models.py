@@ -1,3 +1,17 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Data models for Amazon Translate MCP Server.
 
 This module contains all the data models used throughout the server,
@@ -407,6 +421,14 @@ class TranslateException(Exception):
         error_code: str = 'TRANSLATE_ERROR',
         details: Optional[Dict[str, Any]] = None,
     ):
+        """Initialize the translate exception.
+
+        Args:
+            message: Error message
+            error_code: Error code for categorization
+            details: Additional error details
+
+        """
         super().__init__(message)
         self.message = message
         self.error_code = error_code
@@ -426,6 +448,13 @@ class AuthenticationError(TranslateException):
     """AWS authentication or authorization errors."""
 
     def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        """Initialize the authentication error.
+
+        Args:
+            message: Error message
+            details: Additional error details
+
+        """
         super().__init__(message, 'AUTH_ERROR', details)
 
 
@@ -435,6 +464,14 @@ class ValidationError(TranslateException):
     def __init__(
         self, message: str, field: Optional[str] = None, details: Optional[Dict[str, Any]] = None
     ):
+        """Initialize the validation error.
+
+        Args:
+            message: Error message
+            field: Field name that failed validation
+            details: Additional error details
+
+        """
         details = details or {}
         if field:
             details['field'] = field
@@ -451,6 +488,15 @@ class TranslationError(TranslateException):
         target_lang: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
     ):
+        """Initialize the translation error.
+
+        Args:
+            message: Error message
+            source_lang: Source language code
+            target_lang: Target language code
+            details: Additional error details
+
+        """
         details = details or {}
         if source_lang:
             details['source_language'] = source_lang
@@ -468,6 +514,14 @@ class TerminologyError(TranslateException):
         terminology_name: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
     ):
+        """Initialize the terminology error.
+
+        Args:
+            message: Error message
+            terminology_name: Name of the terminology
+            details: Additional error details
+
+        """
         details = details or {}
         if terminology_name:
             details['terminology_name'] = terminology_name
@@ -480,6 +534,14 @@ class BatchJobError(TranslateException):
     def __init__(
         self, message: str, job_id: Optional[str] = None, details: Optional[Dict[str, Any]] = None
     ):
+        """Initialize the batch job error.
+
+        Args:
+            message: Error message
+            job_id: Batch job identifier
+            details: Additional error details
+
+        """
         details = details or {}
         if job_id:
             details['job_id'] = job_id
@@ -495,6 +557,14 @@ class RateLimitError(TranslateException):
         retry_after: Optional[int] = None,
         details: Optional[Dict[str, Any]] = None,
     ):
+        """Initialize the rate limit error.
+
+        Args:
+            message: Error message
+            retry_after: Seconds to wait before retry
+            details: Additional error details
+
+        """
         super().__init__(message, 'RATE_LIMIT_ERROR', details)
         self.retry_after = retry_after
 
@@ -511,6 +581,14 @@ class ServiceUnavailableError(TranslateException):
     def __init__(
         self, message: str, service: Optional[str] = None, details: Optional[Dict[str, Any]] = None
     ):
+        """Initialize the service unavailable error.
+
+        Args:
+            message: Error message
+            service: Name of the unavailable service
+            details: Additional error details
+
+        """
         details = details or {}
         if service:
             details['service'] = service
@@ -526,6 +604,14 @@ class QuotaExceededError(TranslateException):
         quota_type: Optional[str] = None,
         details: Optional[Dict[str, Any]] = None,
     ):
+        """Initialize the quota exceeded error.
+
+        Args:
+            message: Error message
+            quota_type: Type of quota exceeded
+            details: Additional error details
+
+        """
         details = details or {}
         if quota_type:
             details['quota_type'] = quota_type

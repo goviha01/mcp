@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Extended unit tests for Configuration Management.
 
 This module contains additional comprehensive unit tests for the configuration

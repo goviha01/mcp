@@ -1,3 +1,17 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Amazon Translate MCP Server.
 
 A Model Context Protocol server that provides AI assistants with comprehensive access
@@ -1131,7 +1145,6 @@ async def analyze_batch_translation_errors(
                         aux_data = file_detail.get('auxiliaryData', {})
                         if 'error' in aux_data:
                             error_info = aux_data['error']
-                            error_code = error_info.get('errorCode', 'Unknown')
                             error_message = error_info.get('errorMessage', '')
 
                             # Categorize error patterns
@@ -1263,7 +1276,7 @@ def health_check() -> Dict[str, Any]:
 
 
 def main() -> None:
-    """Main entry point for the Amazon Translate MCP Server."""
+    """Start the Amazon Translate MCP Server."""
     try:
         # Setup logging
         setup_logging()

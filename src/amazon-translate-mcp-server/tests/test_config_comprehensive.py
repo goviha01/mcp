@@ -282,7 +282,7 @@ class TestSetupLogging:
 
         with (
             patch('logging.basicConfig') as mock_basic_config,
-            patch('logging.getLogger') as mock_get_logger,
+            patch('logging.getLogger'),
         ):
             setup_logging(config)
 
@@ -338,7 +338,7 @@ class TestSetupLogging:
         config = ServerConfig(log_level='INFO', enable_audit_logging=True)
 
         with (
-            patch('logging.basicConfig') as mock_basic_config,
+            patch('logging.basicConfig'),
             patch('logging.getLogger') as mock_get_logger,
         ):
             from unittest.mock import Mock
@@ -357,7 +357,7 @@ class TestSetupLogging:
         config = ServerConfig(log_level='INFO', enable_audit_logging=False)
 
         with (
-            patch('logging.basicConfig') as mock_basic_config,
+            patch('logging.basicConfig'),
             patch('logging.getLogger') as mock_get_logger,
         ):
             from unittest.mock import Mock

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Extended unit tests for Batch Manager.
 
 This module contains additional comprehensive unit tests for the BatchJobManager class

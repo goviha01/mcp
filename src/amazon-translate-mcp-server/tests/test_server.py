@@ -255,12 +255,12 @@ class TestHealthCheck:
         """Test health check when all services are healthy."""
         with (
             patch.object(server, 'aws_client_manager') as mock_aws,
-            patch.object(server, 'translation_service') as mock_trans,
-            patch.object(server, 'batch_manager') as mock_batch,
-            patch.object(server, 'terminology_manager') as mock_term,
-            patch.object(server, 'language_operations') as mock_lang,
-            patch.object(server, 'secure_translation_service') as mock_secure,
-            patch.object(server, 'workflow_orchestrator') as mock_workflow,
+            patch.object(server, 'translation_service'),
+            patch.object(server, 'batch_manager'),
+            patch.object(server, 'terminology_manager'),
+            patch.object(server, 'language_operations'),
+            patch.object(server, 'secure_translation_service'),
+            patch.object(server, 'workflow_orchestrator'),
         ):
             # Mock successful credential validation
             mock_aws.validate_credentials.return_value = None

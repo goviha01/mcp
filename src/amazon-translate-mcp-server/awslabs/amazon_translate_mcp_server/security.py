@@ -1,3 +1,17 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Security and compliance features for Amazon Translate MCP Server.
 
 This module provides comprehensive security features including input validation,
@@ -60,6 +74,12 @@ class InputValidator:
     TERMINOLOGY_NAME_PATTERN = re.compile(r'^[a-zA-Z0-9\-_]+$')
 
     def __init__(self, config: SecurityConfig):
+        """Initialize the input validator.
+
+        Args:
+            config: Security configuration settings
+
+        """
         self.config = config
         self.logger = logging.getLogger(__name__)
 
@@ -254,6 +274,12 @@ class PIIDetector:
     CREDIT_CARD_PATTERN = re.compile(r'\b(?:\d{4}[-\s]?){3}\d{4}\b')
 
     def __init__(self, enabled: bool = False):
+        """Initialize the PII detector.
+
+        Args:
+            enabled: Whether PII detection is enabled
+
+        """
         self.enabled = enabled
         self.logger = logging.getLogger(__name__)
 
@@ -374,6 +400,12 @@ class ContentFilter:
     PROFANITY_WORDS = {'damn', 'hell', 'crap', 'shit', 'fuck', 'bitch', 'ass', 'bastard'}
 
     def __init__(self, enabled: bool = False):
+        """Initialize the content filter.
+
+        Args:
+            enabled: Whether content filtering is enabled
+
+        """
         self.enabled = enabled
         self.logger = logging.getLogger(__name__)
 
@@ -440,6 +472,12 @@ class AuditLogger:
     """Audit logger for translation operations."""
 
     def __init__(self, enabled: bool = True):
+        """Initialize the audit logger.
+
+        Args:
+            enabled: Whether audit logging is enabled
+
+        """
         self.enabled = enabled
         self.logger = logging.getLogger('audit')
 
@@ -492,6 +530,12 @@ class SecureFileHandler:
     """Secure file handling for terminology imports."""
 
     def __init__(self, config: SecurityConfig):
+        """Initialize the secure file handler.
+
+        Args:
+            config: Security configuration settings
+
+        """
         self.config = config
         self.logger = logging.getLogger(__name__)
 
@@ -581,6 +625,12 @@ class SecurityManager:
     """Main security manager that coordinates all security features."""
 
     def __init__(self, config: Optional[SecurityConfig] = None):
+        """Initialize the security manager.
+
+        Args:
+            config: Security configuration settings
+
+        """
         self.config = config or SecurityConfig()
         self.validator = InputValidator(self.config)
         self.pii_detector = PIIDetector(self.config.enable_pii_detection)

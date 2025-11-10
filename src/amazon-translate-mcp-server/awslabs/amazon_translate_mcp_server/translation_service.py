@@ -144,7 +144,6 @@ class TranslationService:
             # Extract translation result
             translated_text = response['TranslatedText']
             applied_terminologies = response.get('AppliedTerminologies', [])
-            applied_settings = response.get('AppliedSettings', {})
 
             # Create result object
             result = TranslationResult(

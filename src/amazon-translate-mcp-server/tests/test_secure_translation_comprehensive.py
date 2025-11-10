@@ -270,7 +270,7 @@ class TestSecureTranslationMethods:
         """Test successful secure batch translation."""
         # This method doesn't exist in the actual implementation
         with pytest.raises(AttributeError):
-            result = service.batch_translate_secure(
+            service.batch_translate_secure(
                 input_s3_uri='s3://bucket/input/',
                 output_s3_uri='s3://bucket/output/',
                 source_language='en',
@@ -318,7 +318,7 @@ class TestSecureTranslationHelperMethods:
         """Test security event creation."""
         # This method doesn't exist in the actual implementation
         with pytest.raises(AttributeError):
-            event = service._create_security_event(
+            service._create_security_event(
                 event_type='PII_DETECTED',
                 description='Email address detected',
                 user_id='user123',
@@ -331,13 +331,13 @@ class TestSecureTranslationHelperMethods:
         # This method doesn't exist in the actual implementation
         with pytest.raises(AttributeError):
             text_with_pii = 'Contact me at john@example.com or 555-1234'
-            sanitized = service._sanitize_for_logging(text_with_pii)
+            service._sanitize_for_logging(text_with_pii)
 
     def test_calculate_quality_score(self, service):
         """Test quality score calculation."""
         # This method doesn't exist in the actual implementation
         with pytest.raises(AttributeError):
-            score = service._calculate_quality_score(
+            service._calculate_quality_score(
                 original='Hello world', translated='Hola mundo', source_lang='en', target_lang='es'
             )
 
@@ -345,7 +345,7 @@ class TestSecureTranslationHelperMethods:
         """Test translation issue detection."""
         # This method doesn't exist in the actual implementation
         with pytest.raises(AttributeError):
-            issues = service._detect_translation_issues(
+            service._detect_translation_issues(
                 original='Hello world',
                 translated='Hello world',  # Not translated
                 source_lang='en',
@@ -356,7 +356,7 @@ class TestSecureTranslationHelperMethods:
         """Test translation suggestion generation."""
         # This method doesn't exist in the actual implementation
         with pytest.raises(AttributeError):
-            suggestions = service._generate_translation_suggestions(
+            service._generate_translation_suggestions(
                 original='Hello world',
                 translated='Malo mundo',  # Poor translation
                 source_lang='en',

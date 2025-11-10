@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 TEMP_ENV_VARS = {
     'AWS_REGION': 'us-east-1',
-    'FASTMCP_LOG_LEVEL': 'ERROR'  # Reduce logging noise in tests
+    'FASTMCP_LOG_LEVEL': 'ERROR',  # Reduce logging noise in tests
 }
 
 

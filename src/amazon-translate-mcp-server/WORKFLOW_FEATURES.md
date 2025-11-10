@@ -16,7 +16,7 @@ Intelligent translation with automatic language detection and quality validation
 
 ### Features
 - **Auto-Detection**: Eliminates manual language specification
-- **Quality Assurance**: Built-in translation validation with confidence scoring  
+- **Quality Assurance**: Built-in translation validation with confidence scoring
 - **Language Validation**: Automatic verification of supported language pairs
 - **Comprehensive Results**: Single response with detection, translation, and quality metrics
 
@@ -32,7 +32,7 @@ Intelligent translation with automatic language detection and quality validation
 # MCP Tool Call
 result = await mcp_client.call_tool("smart_translate_workflow", {
     "text": "Bonjour, comment allez-vous?",
-    "target_language": "en", 
+    "target_language": "en",
     "quality_threshold": 0.8,
     "terminology_names": ["business-terms"],  # Optional
     "auto_detect_language": True
@@ -58,7 +58,7 @@ result = await mcp_client.call_tool("smart_translate_workflow", {
     "workflow_steps": [
         "detect_language",
         "validate_language_pair",
-        "translate_text", 
+        "translate_text",
         "validate_translation"
     ]
 }
@@ -131,7 +131,7 @@ result = await mcp_client.call_tool("managed_batch_translation_workflow", {
         },
         {
             "timestamp": "2024-01-15T10:20:00Z",
-            "status": "COMPLETED", 
+            "status": "COMPLETED",
             "progress": 100,
             "elapsed_time": 1200
         }
@@ -150,7 +150,7 @@ result = await mcp_client.call_tool("managed_batch_translation_workflow", {
         "final_status": "COMPLETED"
     },
     "created_at": "2024-01-15T10:00:00Z",
-    "completed_at": "2024-01-15T10:20:00Z", 
+    "completed_at": "2024-01-15T10:20:00Z",
     "total_execution_time": 1200.5,
     "workflow_steps": [
         "validate_language_pairs",
@@ -247,7 +247,7 @@ await smart_translate_workflow(
 - **Comprehensive Monitoring**: Real-time progress tracking and analytics
 - **Quality Assurance**: Automatic validation and quality scoring
 
-### For Organizations  
+### For Organizations
 - **Reduced Complexity**: Eliminates need for custom orchestration logic
 - **Improved Reliability**: Professional-grade error handling and monitoring
 - **Cost Optimization**: Efficient resource usage and automatic cleanup

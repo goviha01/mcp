@@ -12,88 +12,77 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Multi-stage build for Amazon Translate MCP Server
-FROM python:3.10-slim as builder
+# dependabot should continue to update this to the latest hash.
+FROM public.ecr.aws/docker/library/python:3.13-alpine@sha256:070342a0cc1011532c0e69972cce2bbc6cc633eba294bae1d12abea8bd05303b AS uv
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install uv
-RUN pip install uv
-
-# Set working directory
+# Install the project into `/app`
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml uv-requirements.txt ./
+# Enable bytecode compilation
+ENV UV_COMPILE_BYTECODE=1
 
-# Install dependencies
-RUN uv pip install --system -r uv-requirements.txt
+# Copy from the cache instead of linking since it's a mounted volume
+ENV UV_LINK_MODE=copy
 
-# Production stage
-FROM python:3.10-slim
+# Prefer the system python
+ENV UV_PYTHON_PREFERENCE=only-system
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    procps \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+# Run without updating the uv.lock file like running with `--frozen`
+ENV UV_FROZEN=true
 
-# Create non-root user with specific UID/GID for security
-RUN groupadd -r app --gid=1000 && \
-    useradd -r -g app --uid=1000 --home-dir=/app --shell=/bin/bash app
+# Copy the required files first
+COPY pyproject.toml uv.lock uv-requirements.txt ./
 
-# Set working directory
-WORKDIR /app
+# Python optimization and uv configuration
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Copy installed packages from builder
-COPY --from=builder /usr/local/lib/python3.10/site-packages /usr/local/lib/python3.10/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+# Install system dependencies and Python package manager
+RUN apk update && \
+    apk add --no-cache --virtual .build-deps \
+    build-base \
+    gcc \
+    musl-dev \
+    libffi-dev \
+    openssl-dev \
+    cargo
 
-# Copy application code
-COPY awslabs/ ./awslabs/
-COPY docker-healthcheck.sh ./
-COPY validate-config.py ./
-COPY start-server.sh ./
+# Install the project's dependencies using the lockfile and settings
+RUN --mount=type=cache,target=/root/.cache/uv \
+    pip install --require-hashes --requirement uv-requirements.txt --no-cache-dir && \
+    uv sync --python 3.13 --frozen --no-install-project --no-dev --no-editable
 
-# Make scripts executable
-RUN chmod +x docker-healthcheck.sh validate-config.py start-server.sh
+# Then, add the rest of the project source code and install it
+# Installing separately from its dependencies allows optimal layer caching
+COPY . /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --python 3.13 --frozen --no-dev --no-editable
 
-# Change ownership to app user
-RUN chown -R app:app /app
+# Make the directory just in case it doesn't exist
+RUN mkdir -p /root/.local
 
-# Switch to non-root user
+FROM public.ecr.aws/docker/library/python:3.13-alpine@sha256:070342a0cc1011532c0e69972cce2bbc6cc633eba294bae1d12abea8bd05303b
+
+# Place executables in the environment at the front of the path and include other binaries
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1
+
+# Install runtime dependencies and create application user
+RUN apk update && \
+    apk add --no-cache ca-certificates && \
+    update-ca-certificates && \
+    addgroup -S app && \
+    adduser -S app -G app -h /app
+
+# Copy application artifacts from build stage
+COPY --from=uv --chown=app:app /app/.venv /app/.venv
+
+# Get healthcheck script
+COPY ./docker-healthcheck.sh /usr/local/bin/docker-healthcheck.sh
+
+# Run as non-root
 USER app
 
-# Set environment variables with defaults
-ENV PYTHONPATH=/app
-ENV FASTMCP_LOG_LEVEL=INFO
-ENV TRANSLATE_MAX_TEXT_LENGTH=10000
-ENV TRANSLATE_BATCH_TIMEOUT=3600
-ENV TRANSLATE_CACHE_TTL=3600
-ENV ENABLE_TRANSLATION_CACHE=true
-ENV ENABLE_AUDIT_LOGGING=true
-ENV ENABLE_PII_DETECTION=false
-ENV ENABLE_PROFANITY_FILTER=false
-ENV ENABLE_CONTENT_FILTERING=false
-
-# Health check with improved configuration
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-    CMD ./docker-healthcheck.sh
-
-# Expose port (if needed for HTTP mode)
-EXPOSE 8000
-
-# Add labels for better container management
-LABEL maintainer="AWSLabs MCP <203918161+awslabs-mcp@users.noreply.github.com>"
-LABEL version="1.0.0"
-LABEL description="Amazon Translate MCP Server"
-LABEL org.opencontainers.image.source="https://github.com/awslabs/mcp"
-LABEL org.opencontainers.image.documentation="https://awslabs.github.io/mcp/servers/amazon-translate-mcp-server/"
-LABEL org.opencontainers.image.licenses="Apache-2.0"
-
-# Default command with configuration validation
-CMD ["./start-server.sh"]
+# When running the container, add --db-path and a bind mount to the host's db file
+HEALTHCHECK --interval=60s --timeout=10s --start-period=10s --retries=3 CMD ["docker-healthcheck.sh"]
+ENTRYPOINT ["awslabs.amazon-translate-mcp-server"]

@@ -59,15 +59,6 @@ fi
 
 log_info "Python version check passed: ${PYTHON_VERSION}"
 
-# Validate configuration
-log_info "Validating configuration..."
-
-if python3 validate-config.py; then
-    log_info "Configuration validation passed"
-else
-    log_error "Configuration validation failed"
-    exit 1
-fi
 
 # Check if server module is available
 if ! python3 -c "import awslabs.amazon_translate_mcp_server.server" 2>/dev/null; then

@@ -31,7 +31,7 @@ ENV UV_PYTHON_PREFERENCE=only-system
 ENV UV_FROZEN=true
 
 # Copy the required files first
-COPY pyproject.toml uv.lock uv-requirements.txt ./
+COPY pyproject.toml uv-requirements.txt ./
 
 # Python optimization and uv configuration
 ENV PIP_NO_CACHE_DIR=1 \

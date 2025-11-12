@@ -19,6 +19,7 @@ translation operations into cohesive, automated workflows for enhanced user expe
 """
 
 import asyncio
+import json
 import logging
 import time
 from .batch_manager import BatchJobManager
@@ -206,8 +207,6 @@ class WorkflowOrchestrator:
                     error_text = error_content['Body'].read().decode('utf-8')
 
                     try:
-                        import json
-
                         error_data = json.loads(error_text)
 
                         error_analysis['error_files_found'].append(obj['Key'])
@@ -599,7 +598,7 @@ class WorkflowOrchestrator:
             language_pairs = await loop.run_in_executor(
                 None, self.language_operations.list_language_pairs
             )
-            validation_results = {'supported_pairs': [], 'unsupported_pairs': []}
+            validation_results: Dict[str, Any] = {'supported_pairs': [], 'unsupported_pairs': []}
 
             for target_lang in target_languages:
                 pair_supported = any(
@@ -628,6 +627,9 @@ class WorkflowOrchestrator:
             if terminology_names:
                 context.current_step = 'validate_terminologies'
                 logger.debug(f'Step 2: Validating terminologies for workflow {workflow_id}')
+                
+                # Type narrowing: terminology_names is now List[str] (not Optional)
+                terminology_names_list: List[str] = terminology_names
 
                 # Run synchronous method in thread pool
                 loop = asyncio.get_event_loop()
@@ -639,7 +641,7 @@ class WorkflowOrchestrator:
                 ]
 
                 missing_terminologies = [
-                    name for name in terminology_names if name not in available_terminologies
+                    name for name in terminology_names_list if name not in available_terminologies
                 ]
 
                 if missing_terminologies:
@@ -652,7 +654,7 @@ class WorkflowOrchestrator:
                     )
 
                 validation_results['terminologies'] = {
-                    'requested': terminology_names,
+                    'requested': terminology_names_list,
                     'available': available_terminologies,
                     'validated': True,
                 }
@@ -867,9 +869,12 @@ class WorkflowOrchestrator:
 
     def list_active_workflows(self) -> List[Dict[str, Any]]:
         """List all currently active workflows."""
-        return [
-            self.get_workflow_status(workflow_id) for workflow_id in self._active_workflows.keys()
-        ]
+        workflows = []
+        for workflow_id in self._active_workflows.keys():
+            status = self.get_workflow_status(workflow_id)
+            if status is not None:
+                workflows.append(status)
+        return workflows
 
     def get_workflow_result(self, workflow_id: str) -> Optional[Any]:
         """Get the result of a completed workflow."""

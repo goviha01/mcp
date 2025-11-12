@@ -309,7 +309,7 @@ class BatchJobManager:
             )
 
         try:
-            request_params = {'MaxResults': max_results}
+            request_params: Dict[str, Any] = {'MaxResults': max_results}
 
             if status_filter:
                 request_params['Filter'] = {'Status': status_filter}

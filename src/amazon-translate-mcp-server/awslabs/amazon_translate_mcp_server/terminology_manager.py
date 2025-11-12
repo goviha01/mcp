@@ -24,7 +24,7 @@ import io
 import logging
 import re
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 
 try:
@@ -99,7 +99,7 @@ class TerminologyManager:
 
     def list_terminologies(
         self, max_results: int = 50, next_token: Optional[str] = None
-    ) -> Dict[str, Union[List[TerminologySummary], Optional[str]]]:
+    ) -> Dict[str, Any]:
         """List all available terminologies.
 
         Args:
@@ -129,7 +129,7 @@ class TerminologyManager:
             client = self._get_translate_client()
 
             # Prepare request parameters
-            params = {'MaxResults': max_results}
+            params: Dict[str, Any] = {'MaxResults': max_results}
             if next_token:
                 params['NextToken'] = next_token
 
@@ -371,9 +371,11 @@ class TerminologyManager:
 
         # Use detected languages if not provided
         if source_language is None:
-            source_language = validation_result['source_language']
+            source_lang = validation_result.get('source_language')
+            source_language = source_lang if isinstance(source_lang, str) else None
         if target_languages is None:
-            target_languages = validation_result['target_languages']
+            target_langs = validation_result.get('target_languages')
+            target_languages = target_langs if isinstance(target_langs, list) else None
 
         # Create terminology data
         terminology_data = TerminologyData(

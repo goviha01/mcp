@@ -33,6 +33,7 @@ from .exceptions import (
     ValidationError,
     WorkflowError,
 )
+from .models import TranslationJobSummary
 from .language_operations import LanguageOperations
 from .logging_config import setup_logging
 from .secure_translation_service import SecureTranslationService
@@ -460,25 +461,37 @@ async def list_translation_jobs(params: ListTranslationJobsParams) -> Dict[str, 
 
         # Run synchronous method in thread pool
         loop = asyncio.get_event_loop()
-        jobs = await loop.run_in_executor(
+        result = await loop.run_in_executor(
             None, batch_manager.list_translation_jobs, params.status_filter, params.max_results
         )
 
+        if isinstance(result, list):
+            jobs: List[TranslationJobSummary] = result
+            next_token = None
+        else:
+            jobs: List[TranslationJobSummary] = result.get('jobs', [])
+            next_token = result.get('next_token')
+
         job_list = []
         for job in jobs:
+            job_summary: TranslationJobSummary = job  # type: ignore
             job_list.append(
                 {
-                    'job_id': job.job_id,
-                    'job_name': job.job_name,
-                    'status': job.status,
-                    'source_language': job.source_language_code,
-                    'target_languages': job.target_language_codes,
-                    'created_at': job.created_at.isoformat() if job.created_at else None,
-                    'completed_at': job.completed_at.isoformat() if job.completed_at else None,
+                    'job_id': job_summary.job_id,
+                    'job_name': job_summary.job_name,
+                    'status': job_summary.status,
+                    'source_language': job_summary.source_language_code,
+                    'target_languages': job_summary.target_language_codes,
+                    'created_at': job_summary.created_at.isoformat() if job_summary.created_at else None,
+                    'completed_at': job_summary.completed_at.isoformat() if job_summary.completed_at else None,
                 }
             )
 
-        return {'jobs': job_list, 'total_count': len(job_list)}
+        return {
+            'jobs': job_list, 
+            'total_count': len(job_list),
+            'next_token': next_token
+        }
 
     except Exception as e:
         logger.error(f'Failed to list translation jobs: {e}')
@@ -501,6 +514,8 @@ async def list_terminologies() -> Dict[str, Any]:
 
         # The method returns a dict with 'terminologies' and 'next_token'
         terminologies = result.get('terminologies', [])
+        if terminologies is None:
+            terminologies = []
 
         terminology_list = []
         for terminology in terminologies:
@@ -869,10 +884,13 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
             raise BatchJobError('Batch manager not initialized')
 
         # Pre-validate language pairs
+        if not language_operations:
+            raise BatchJobError('Language operations not initialized')
+            
         loop = asyncio.get_event_loop()
         language_pairs = await loop.run_in_executor(None, language_operations.list_language_pairs)
 
-        validation_results = {'supported_pairs': [], 'unsupported_pairs': []}
+        validation_results: Dict[str, Any] = {'supported_pairs': [], 'unsupported_pairs': []}
 
         for target_lang in params.target_languages:
             pair_supported = any(
@@ -898,6 +916,9 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
 
         # Validate terminologies if provided
         if params.terminology_names:
+            if not terminology_manager:
+                raise BatchJobError('Terminology manager not initialized')
+                
             terminologies_result = await loop.run_in_executor(
                 None, terminology_manager.list_terminologies
             )

@@ -34,7 +34,7 @@ from .models import (
     ValidationResult,
 )
 from botocore.exceptions import BotoCoreError, ClientError
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, NoReturn, Optional
 
 
 logger = logging.getLogger(__name__)
@@ -119,7 +119,7 @@ class TranslationService:
             logger.debug('Auto-detected source language: %s', source_language)
 
         # Prepare translation request
-        translate_request = {
+        translate_request: Dict[str, Any] = {
             'Text': text,
             'SourceLanguageCode': source_language,
             'TargetLanguageCode': target_language,
@@ -512,8 +512,10 @@ class TranslationService:
         # If we get here, all retries failed
         if isinstance(last_exception, ClientError):
             self._handle_client_error(last_exception, 'retry_operation')
-        else:
+        elif last_exception is not None:
             raise last_exception
+        else:
+            raise TranslationError("Operation failed after all retries with no recorded exception")
 
     def _calculate_retry_delay(self, attempt: int) -> float:
         """Calculate retry delay using exponential backoff with optional jitter.
@@ -562,7 +564,7 @@ class TranslationService:
 
         return None
 
-    def _handle_client_error(self, client_error: ClientError, operation: str) -> None:
+    def _handle_client_error(self, client_error: ClientError, operation: str) -> NoReturn:
         """Handle AWS client errors and convert to appropriate exceptions.
 
         Args:

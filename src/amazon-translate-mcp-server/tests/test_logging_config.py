@@ -43,7 +43,7 @@ class TestCorrelationIdFilter:
         result = filter_instance.filter(record)
 
         assert result is True
-        assert record.correlation_id == 'record-correlation-123'
+        assert getattr(record, 'correlation_id', None) == 'record-correlation-123'
 
     def test_filter_adds_correlation_id_from_context(self):
         """Test filter adds correlation ID from context variable."""
@@ -65,7 +65,7 @@ class TestCorrelationIdFilter:
             result = filter_instance.filter(record)
 
             assert result is True
-            assert record.correlation_id == 'context-correlation-456'
+            assert getattr(record, 'correlation_id', None) == 'context-correlation-456'
         finally:
             correlation_id_context.set(None)
 
@@ -85,7 +85,7 @@ class TestCorrelationIdFilter:
         result = filter_instance.filter(record)
 
         assert result is True
-        assert record.correlation_id == 'no-correlation-id'
+        assert getattr(record, 'correlation_id', None) == 'no-correlation-id'
 
 
 class TestStructuredFormatter:

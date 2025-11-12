@@ -311,7 +311,7 @@ class TestJobConfig:
         assert config.source_language_code == 'en'
         assert config.target_language_codes == ['es', 'fr']
         assert config.terminology_names == ['tech-terms']
-        assert config.settings.formality == 'FORMAL'
+        assert config.settings is not None and config.settings.formality == 'FORMAL'
 
     def test_empty_job_name_raises_error(self):
         """Test that empty job name raises ValueError."""

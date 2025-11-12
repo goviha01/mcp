@@ -479,9 +479,11 @@ def map_aws_error(
     error_message = str(aws_error)
 
     # Extract additional error details from AWS response
+    from botocore.exceptions import ClientError
     details = {}
-    if hasattr(aws_error, 'response'):
-        response = aws_error.response
+    # Check if it's a ClientError or has response attribute (for Mock objects in tests)
+    if isinstance(aws_error, ClientError) or hasattr(aws_error, 'response'):
+        response = getattr(aws_error, 'response', {})
         if 'Error' in response:
             error_info = response['Error']
             details.update(
@@ -512,7 +514,8 @@ def map_aws_error(
     if error_code in ['ThrottlingException', 'TooManyRequestsException']:
         # Extract retry_after from headers if available
         if hasattr(aws_error, 'response'):
-            headers = aws_error.response.get('ResponseMetadata', {}).get('HTTPHeaders', {})
+            response = getattr(aws_error, 'response', {})
+            headers = response.get('ResponseMetadata', {}).get('HTTPHeaders', {})
             retry_after = headers.get('Retry-After')
             if retry_after:
                 try:

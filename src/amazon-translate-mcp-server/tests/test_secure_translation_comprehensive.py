@@ -242,7 +242,7 @@ class TestSecureTranslationMethods:
         # Verify result
         assert isinstance(result, ValidationResult)
         assert result.is_valid is True
-        assert result.quality_score > 0
+        assert result.quality_score is not None and result.quality_score > 0
 
     def test_validate_translation_secure_low_quality(self, service):
         """Test secure translation validation with low quality result."""
@@ -264,7 +264,7 @@ class TestSecureTranslationMethods:
 
         # Verify low quality result
         assert isinstance(result, ValidationResult)
-        assert result.quality_score < 0.8  # Should be low quality
+        assert result.quality_score is not None and result.quality_score < 0.8  # Should be low quality
 
     def test_batch_translate_secure_success(self, service):
         """Test successful secure batch translation."""

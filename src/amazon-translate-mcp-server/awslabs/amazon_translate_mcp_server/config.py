@@ -225,6 +225,14 @@ def validate_startup_configuration() -> ServerConfig:
         RuntimeError: If AWS services are not accessible
 
     """
+    # Import AWS modules at function level
+    import boto3
+    from botocore.exceptions import (
+        ClientError,
+        NoCredentialsError,
+        PartialCredentialsError,
+    )
+    
     logger = logging.getLogger(__name__)
     logger.info('Starting configuration validation...')
 
@@ -239,12 +247,6 @@ def validate_startup_configuration() -> ServerConfig:
 
         # Test AWS connectivity
         try:
-            import boto3
-            from botocore.exceptions import (
-                ClientError,
-                NoCredentialsError,
-                PartialCredentialsError,
-            )
 
             # Create a session with the configured credentials
             session_kwargs = {}

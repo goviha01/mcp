@@ -520,7 +520,8 @@ class TestTranslationService:
             error_response={'Error': {'Code': 'ThrottlingException', 'Message': 'Rate exceeded'}},
             operation_name='translate_text',
         )
-        client_error.response['ResponseMetadata'] = {'HTTPHeaders': {'Retry-After': '30'}}
+        # Type ignore for test mock assignment
+        client_error.response['ResponseMetadata'] = {'HTTPHeaders': {'Retry-After': '30'}}  # type: ignore
 
         retry_after = translation_service._extract_retry_after(client_error)
         assert retry_after == 30

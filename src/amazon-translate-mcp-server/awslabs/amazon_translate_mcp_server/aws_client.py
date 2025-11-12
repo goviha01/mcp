@@ -129,7 +129,7 @@ class AWSClientManager(LoggerMixin):
             self._validate_credentials()
 
             self.info(
-                f'AWS session initialized successfully. Region: {self._session.region_name or "default"}, '
+                f'AWS session initialized successfully. Region: {self._session.region_name if self._session else "default"}, '
                 f'Profile: {self._profile_name or "default"}'
             )
 
@@ -169,6 +169,9 @@ class AWSClientManager(LoggerMixin):
         """Validate AWS credentials by calling STS GetCallerIdentity."""
         correlation_id = correlation_id or get_correlation_id()
 
+        if not self._session:
+            raise AuthenticationError("AWS session not initialized", correlation_id=correlation_id)
+
         try:
             sts_client = self._session.client('sts', config=self._config)
             response = sts_client.get_caller_identity()
@@ -207,6 +210,9 @@ class AWSClientManager(LoggerMixin):
             # Return cached client if available
             if service_name in self._clients:
                 return self._clients[service_name]
+
+            if not self._session:
+                raise AuthenticationError("AWS session not initialized")
 
             try:
                 # Create new client
@@ -389,6 +395,9 @@ class AWSClientManager(LoggerMixin):
             Current AWS account ID or None if unable to retrieve
 
         """
+        if not self._session:
+            return None
+            
         try:
             sts_client = self._session.client('sts', config=self._config)
             response = sts_client.get_caller_identity()
@@ -404,6 +413,9 @@ class AWSClientManager(LoggerMixin):
             Current user/role ARN or None if unable to retrieve
 
         """
+        if not self._session:
+            return None
+            
         try:
             sts_client = self._session.client('sts', config=self._config)
             response = sts_client.get_caller_identity()

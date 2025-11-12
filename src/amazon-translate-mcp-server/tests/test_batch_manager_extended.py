@@ -168,8 +168,9 @@ class TestBatchJobManagerExtended:
 
         assert 'Service quota exceeded' in str(exc_info.value)
         # Check if quota_type is in details if not as direct attribute
-        if hasattr(exc_info.value, 'quota_type'):
-            assert exc_info.value.quota_type == 'batch_translation_jobs'
+        quota_type = getattr(exc_info.value, 'quota_type', None)
+        if quota_type is not None:
+            assert quota_type == 'batch_translation_jobs'
         else:
             assert exc_info.value.details.get('quota_type') == 'batch_translation_jobs'
 
@@ -245,8 +246,9 @@ class TestBatchJobManagerExtended:
 
         assert 'AWS service error' in str(exc_info.value)
         # Check if service is available as attribute or in details
-        if hasattr(exc_info.value, 'service'):
-            assert exc_info.value.service == 'translate'
+        service = getattr(exc_info.value, 'service', None)
+        if service is not None:
+            assert service == 'translate'
         else:
             assert exc_info.value.details.get('service') == 'translate'
 

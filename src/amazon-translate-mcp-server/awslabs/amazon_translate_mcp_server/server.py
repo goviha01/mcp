@@ -33,9 +33,9 @@ from .exceptions import (
     ValidationError,
     WorkflowError,
 )
-from .models import TranslationJobSummary
 from .language_operations import LanguageOperations
 from .logging_config import setup_logging
+from .models import TranslationJobSummary
 from .secure_translation_service import SecureTranslationService
 from .terminology_manager import TerminologyManager
 from .translation_service import TranslationService
@@ -482,16 +482,16 @@ async def list_translation_jobs(params: ListTranslationJobsParams) -> Dict[str, 
                     'status': job_summary.status,
                     'source_language': job_summary.source_language_code,
                     'target_languages': job_summary.target_language_codes,
-                    'created_at': job_summary.created_at.isoformat() if job_summary.created_at else None,
-                    'completed_at': job_summary.completed_at.isoformat() if job_summary.completed_at else None,
+                    'created_at': job_summary.created_at.isoformat()
+                    if job_summary.created_at
+                    else None,
+                    'completed_at': job_summary.completed_at.isoformat()
+                    if job_summary.completed_at
+                    else None,
                 }
             )
 
-        return {
-            'jobs': job_list, 
-            'total_count': len(job_list),
-            'next_token': next_token
-        }
+        return {'jobs': job_list, 'total_count': len(job_list), 'next_token': next_token}
 
     except Exception as e:
         logger.error(f'Failed to list translation jobs: {e}')
@@ -886,7 +886,7 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
         # Pre-validate language pairs
         if not language_operations:
             raise BatchJobError('Language operations not initialized')
-            
+
         loop = asyncio.get_event_loop()
         language_pairs = await loop.run_in_executor(None, language_operations.list_language_pairs)
 
@@ -918,7 +918,7 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
         if params.terminology_names:
             if not terminology_manager:
                 raise BatchJobError('Terminology manager not initialized')
-                
+
             terminologies_result = await loop.run_in_executor(
                 None, terminology_manager.list_terminologies
             )

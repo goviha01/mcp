@@ -170,7 +170,7 @@ class AWSClientManager(LoggerMixin):
         correlation_id = correlation_id or get_correlation_id()
 
         if not self._session:
-            raise AuthenticationError("AWS session not initialized", correlation_id=correlation_id)
+            raise AuthenticationError('AWS session not initialized', correlation_id=correlation_id)
 
         try:
             sts_client = self._session.client('sts', config=self._config)
@@ -212,7 +212,7 @@ class AWSClientManager(LoggerMixin):
                 return self._clients[service_name]
 
             if not self._session:
-                raise AuthenticationError("AWS session not initialized")
+                raise AuthenticationError('AWS session not initialized')
 
             try:
                 # Create new client
@@ -397,7 +397,7 @@ class AWSClientManager(LoggerMixin):
         """
         if not self._session:
             return None
-            
+
         try:
             sts_client = self._session.client('sts', config=self._config)
             response = sts_client.get_caller_identity()
@@ -415,7 +415,7 @@ class AWSClientManager(LoggerMixin):
         """
         if not self._session:
             return None
-            
+
         try:
             sts_client = self._session.client('sts', config=self._config)
             response = sts_client.get_caller_identity()

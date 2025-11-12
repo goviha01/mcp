@@ -1,15 +1,13 @@
 """Tests for configuration validation functionality."""
 
-import os
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from botocore.exceptions import ClientError
-
 from awslabs.amazon_translate_mcp_server.config import (
-    validate_startup_configuration,
-    print_configuration_summary,
     ServerConfig,
+    print_configuration_summary,
+    validate_startup_configuration,
 )
+from botocore.exceptions import ClientError
+from unittest.mock import Mock, patch
 
 
 class TestValidateStartupConfiguration:
@@ -18,7 +16,9 @@ class TestValidateStartupConfiguration:
     @patch('boto3.Session')
     @patch('awslabs.amazon_translate_mcp_server.config.load_config_from_env')
     @patch('awslabs.amazon_translate_mcp_server.config.validate_aws_config')
-    def test_validate_startup_configuration_success(self, mock_validate_aws, mock_load_config, mock_boto3_session):
+    def test_validate_startup_configuration_success(
+        self, mock_validate_aws, mock_load_config, mock_boto3_session
+    ):
         """Test successful configuration validation."""
         # Setup mocks
         config = ServerConfig()
@@ -28,28 +28,28 @@ class TestValidateStartupConfiguration:
         config.cache_ttl = 3600
         config.max_file_size = 10 * 1024 * 1024  # 10MB
         config.blocked_patterns = [r'\d{3}-\d{2}-\d{4}']  # SSN pattern
-        
+
         mock_load_config.return_value = config
-        
+
         # Mock AWS clients
         mock_session = Mock()
         mock_boto3_session.return_value = mock_session
-        
+
         mock_translate_client = Mock()
         mock_translate_client.list_languages.return_value = {'Languages': [{'LanguageCode': 'en'}]}
-        
+
         # Mock S3 client
         mock_s3_client = Mock()
         mock_s3_client.list_buckets.return_value = {'Buckets': []}
-        
+
         mock_session.client.side_effect = lambda service: {
             'translate': mock_translate_client,
-            's3': mock_s3_client
+            's3': mock_s3_client,
         }[service]
-        
+
         # Test
         result = validate_startup_configuration()
-        
+
         # Assertions
         assert result == config
         mock_load_config.assert_called_once()
@@ -59,9 +59,9 @@ class TestValidateStartupConfiguration:
     @patch('awslabs.amazon_translate_mcp_server.config.load_config_from_env')
     def test_validate_startup_configuration_load_config_failure(self, mock_load_config):
         """Test configuration validation when config loading fails."""
-        mock_load_config.side_effect = ValueError("Invalid configuration")
-        
-        with pytest.raises(ValueError, match="Invalid configuration"):
+        mock_load_config.side_effect = ValueError('Invalid configuration')
+
+        with pytest.raises(ValueError, match='Invalid configuration'):
             validate_startup_configuration()
 
     @patch('boto3.Session')
@@ -74,18 +74,18 @@ class TestValidateStartupConfiguration:
         config = ServerConfig()
         config.aws_region = 'us-east-1'
         mock_load_config.return_value = config
-        
+
         # Mock AWS session and client
         mock_session = Mock()
         mock_boto3_session.return_value = mock_session
-        
+
         mock_translate_client = Mock()
         mock_translate_client.list_languages.side_effect = ClientError(
             error_response={'Error': {'Code': 'AccessDenied', 'Message': 'Access denied'}},
-            operation_name='list_languages'
+            operation_name='list_languages',
         )
         mock_session.client.return_value = mock_translate_client
-        
+
         # Should not raise exception, just warn
         result = validate_startup_configuration()
         assert result == config
@@ -100,48 +100,48 @@ class TestValidateStartupConfiguration:
         config = ServerConfig()
         config.aws_region = 'invalid-region'
         mock_load_config.return_value = config
-        
+
         # Mock AWS session and client
         mock_session = Mock()
         mock_boto3_session.return_value = mock_session
-        
+
         mock_translate_client = Mock()
         mock_translate_client.list_languages.side_effect = ClientError(
             error_response={'Error': {'Code': 'InvalidRegion', 'Message': 'Invalid region'}},
-            operation_name='list_languages'
+            operation_name='list_languages',
         )
         mock_session.client.return_value = mock_translate_client
-        
+
         # Should not raise exception, just warn
         result = validate_startup_configuration()
         assert result == config
 
-
-
     @patch('awslabs.amazon_translate_mcp_server.config.load_config_from_env')
     @patch('awslabs.amazon_translate_mcp_server.config.validate_aws_config')
-    def test_validate_startup_configuration_invalid_cache_config(self, mock_validate_aws, mock_load_config):
+    def test_validate_startup_configuration_invalid_cache_config(
+        self, mock_validate_aws, mock_load_config
+    ):
         """Test configuration validation with invalid cache configuration."""
         config = ServerConfig()
         config.enable_translation_cache = True
         config.cache_ttl = -1  # Invalid negative TTL
         mock_load_config.return_value = config
-        
-        with pytest.raises(ValueError, match="Cache TTL must be positive when caching is enabled"):
+
+        with pytest.raises(ValueError, match='Cache TTL must be positive when caching is enabled'):
             validate_startup_configuration()
 
     @patch('awslabs.amazon_translate_mcp_server.config.load_config_from_env')
     @patch('awslabs.amazon_translate_mcp_server.config.validate_aws_config')
-    def test_validate_startup_configuration_invalid_regex_pattern(self, mock_validate_aws, mock_load_config):
+    def test_validate_startup_configuration_invalid_regex_pattern(
+        self, mock_validate_aws, mock_load_config
+    ):
         """Test configuration validation with invalid regex pattern."""
         config = ServerConfig()
         config.blocked_patterns = ['[invalid regex']  # Invalid regex
         mock_load_config.return_value = config
-        
-        with pytest.raises(ValueError, match="Invalid regex pattern"):
+
+        with pytest.raises(ValueError, match='Invalid regex pattern'):
             validate_startup_configuration()
-
-
 
 
 class TestPrintConfigurationSummary:
@@ -162,14 +162,14 @@ class TestPrintConfigurationSummary:
         config.max_file_size = 5 * 1024 * 1024  # 5MB
         config.batch_timeout = 3600
         config.cache_ttl = 1800
-        config.allowed_file_extensions = ['.txt', '.docx', '.pdf']
+        config.allowed_file_extensions = {'.txt', '.docx', '.pdf'}
         config.blocked_patterns = ['pattern1', 'pattern2']
-        
+
         print_configuration_summary(config)
-        
+
         captured = capsys.readouterr()
         output = captured.out
-        
+
         # Check that key information is present
         assert 'Amazon Translate MCP Server Configuration Summary' in output
         assert 'AWS Region: us-west-2' in output
@@ -191,23 +191,23 @@ class TestPrintConfigurationSummary:
         """Test printing configuration summary with default profile."""
         config = ServerConfig()
         config.aws_profile = None  # Default profile
-        
+
         print_configuration_summary(config)
-        
+
         captured = capsys.readouterr()
         output = captured.out
-        
+
         assert 'AWS Profile: Default' in output
 
     def test_print_configuration_summary_no_blocked_patterns(self, capsys):
         """Test printing configuration summary without blocked patterns."""
         config = ServerConfig()
         config.blocked_patterns = []
-        
+
         print_configuration_summary(config)
-        
+
         captured = capsys.readouterr()
         output = captured.out
-        
+
         # Should not mention blocked patterns if none are configured
         assert 'Blocked Patterns:' not in output

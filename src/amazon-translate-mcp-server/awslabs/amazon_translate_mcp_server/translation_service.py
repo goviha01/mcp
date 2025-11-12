@@ -515,7 +515,7 @@ class TranslationService:
         elif last_exception is not None:
             raise last_exception
         else:
-            raise TranslationError("Operation failed after all retries with no recorded exception")
+            raise TranslationError('Operation failed after all retries with no recorded exception')
 
     def _calculate_retry_delay(self, attempt: int) -> float:
         """Calculate retry delay using exponential backoff with optional jitter.

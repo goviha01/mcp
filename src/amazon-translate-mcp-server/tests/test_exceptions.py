@@ -313,7 +313,10 @@ class TestErrorResponseIntegration:
         assert response.error_type == 'ValidationError'
         assert response.error_code == 'VALIDATION_001'
         assert response.message == 'Invalid input data'
-        assert response.details is not None and response.details['field_errors']['name'] == 'Required field'
+        assert (
+            response.details is not None
+            and response.details['field_errors']['name'] == 'Required field'
+        )
         assert response.correlation_id == 'test-correlation-id'
         assert response.retry_after is None
 
@@ -341,8 +344,14 @@ class TestErrorResponseIntegration:
         response = exc.to_error_response()
 
         assert response.details == details
-        assert response.details is not None and response.details['validation_errors']['source_language'] == 'Invalid language code'
-        assert response.details is not None and response.details['request_info']['method'] == 'translate_text'
+        assert (
+            response.details is not None
+            and response.details['validation_errors']['source_language'] == 'Invalid language code'
+        )
+        assert (
+            response.details is not None
+            and response.details['request_info']['method'] == 'translate_text'
+        )
 
 
 if __name__ == '__main__':

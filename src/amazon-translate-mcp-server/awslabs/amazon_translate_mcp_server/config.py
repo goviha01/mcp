@@ -232,7 +232,7 @@ def validate_startup_configuration() -> ServerConfig:
         NoCredentialsError,
         PartialCredentialsError,
     )
-    
+
     logger = logging.getLogger(__name__)
     logger.info('Starting configuration validation...')
 
@@ -247,7 +247,6 @@ def validate_startup_configuration() -> ServerConfig:
 
         # Test AWS connectivity
         try:
-
             # Create a session with the configured credentials
             session_kwargs = {}
             if config.aws_profile:

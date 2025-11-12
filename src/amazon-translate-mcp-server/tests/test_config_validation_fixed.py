@@ -1,11 +1,8 @@
 """Tests for configuration validation functionality."""
 
-import pytest
-from unittest.mock import Mock, patch
-
 from awslabs.amazon_translate_mcp_server.config import (
-    print_configuration_summary,
     ServerConfig,
+    print_configuration_summary,
 )
 
 
@@ -27,14 +24,14 @@ class TestPrintConfigurationSummary:
         config.max_file_size = 5 * 1024 * 1024  # 5MB
         config.batch_timeout = 3600
         config.cache_ttl = 1800
-        config.allowed_file_extensions = ['.txt', '.docx', '.pdf']
+        config.allowed_file_extensions = {'.txt', '.docx', '.pdf'}
         config.blocked_patterns = ['pattern1', 'pattern2']
-        
+
         print_configuration_summary(config)
-        
+
         captured = capsys.readouterr()
         output = captured.out
-        
+
         # Check that key information is present
         assert 'Amazon Translate MCP Server Configuration Summary' in output
         assert 'AWS Region: us-west-2' in output
@@ -56,24 +53,24 @@ class TestPrintConfigurationSummary:
         """Test printing configuration summary with default profile."""
         config = ServerConfig()
         config.aws_profile = None  # Default profile
-        
+
         print_configuration_summary(config)
-        
+
         captured = capsys.readouterr()
         output = captured.out
-        
+
         assert 'AWS Profile: Default' in output
 
     def test_print_configuration_summary_no_blocked_patterns(self, capsys):
         """Test printing configuration summary without blocked patterns."""
         config = ServerConfig()
         config.blocked_patterns = []
-        
+
         print_configuration_summary(config)
-        
+
         captured = capsys.readouterr()
         output = captured.out
-        
+
         # Should not mention blocked patterns if none are configured
         assert 'Blocked Patterns:' not in output
 
@@ -88,9 +85,9 @@ class TestServerConfigEdgeCases:
         config.enable_profanity_filter = True
         config.enable_content_filtering = True
         config.enable_audit_logging = False
-        
+
         security_config = config.to_security_config()
-        
+
         assert security_config.enable_pii_detection is True
         assert security_config.enable_profanity_filter is True
         assert security_config.enable_content_filtering is True
@@ -99,9 +96,9 @@ class TestServerConfigEdgeCases:
     def test_server_config_defaults(self):
         """Test ServerConfig default values."""
         config = ServerConfig()
-        
+
         # Test that defaults are set properly
-        assert config.log_level == "INFO"
+        assert config.log_level == 'INFO'
         assert config.max_text_length == 10000
         assert config.batch_timeout == 3600
         assert config.cache_ttl == 3600
@@ -119,7 +116,7 @@ class TestServerConfigEdgeCases:
         config.log_level = 'DEBUG'
         config.max_text_length = 50000
         config.enable_pii_detection = True
-        
+
         assert config.aws_region == 'eu-west-1'
         assert config.aws_profile == 'production'
         assert config.log_level == 'DEBUG'
@@ -129,7 +126,7 @@ class TestServerConfigEdgeCases:
     def test_server_config_file_extensions(self):
         """Test ServerConfig file extensions handling."""
         config = ServerConfig()
-        
+
         # Default extensions should be present
         assert '.txt' in config.allowed_file_extensions
         assert '.csv' in config.allowed_file_extensions
@@ -139,6 +136,6 @@ class TestServerConfigEdgeCases:
         """Test ServerConfig blocked patterns handling."""
         config = ServerConfig()
         config.blocked_patterns = [r'\d{3}-\d{2}-\d{4}', r'[A-Z]{2}\d{6}']
-        
+
         assert len(config.blocked_patterns) == 2
         assert r'\d{3}-\d{2}-\d{4}' in config.blocked_patterns

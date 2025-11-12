@@ -306,8 +306,14 @@ class TestBatchJobManager:
         assert job_status.status == 'IN_PROGRESS'
         assert job_status.progress == 50.0  # IN_PROGRESS jobs get 50%
         assert job_status.created_at == datetime(2023, 1, 1, 12, 0, 0)
-        assert job_status.input_config is not None and job_status.input_config.s3_uri == 's3://input-bucket/docs/'
-        assert job_status.output_config is not None and job_status.output_config.s3_uri == 's3://output-bucket/translations/'
+        assert (
+            job_status.input_config is not None
+            and job_status.input_config.s3_uri == 's3://input-bucket/docs/'
+        )
+        assert (
+            job_status.output_config is not None
+            and job_status.output_config.s3_uri == 's3://output-bucket/translations/'
+        )
 
     def test_get_translation_job_not_found(self, batch_manager):
         """Test job status retrieval for non-existent job."""

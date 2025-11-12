@@ -119,6 +119,7 @@ class RetryConfig:
 
         # Check for specific AWS errors that should be retried
         from botocore.exceptions import ClientError
+
         if isinstance(exception, ClientError) or hasattr(exception, 'response'):
             error_code = getattr(exception, 'response', {}).get('Error', {}).get('Code', '')
             retryable_aws_errors = [
@@ -214,7 +215,7 @@ class RetryHandler:
         elif last_exception is not None:
             raise map_aws_error(last_exception, correlation_id)
         else:
-            raise TranslateException("All retry attempts failed with no recorded exception")
+            raise TranslateException('All retry attempts failed with no recorded exception')
 
     async def async_retry(
         self, func: Callable, *args, correlation_id: Optional[str] = None, **kwargs
@@ -284,7 +285,7 @@ class RetryHandler:
         elif last_exception is not None:
             raise map_aws_error(last_exception, correlation_id)
         else:
-            raise TranslateException("All retry attempts failed with no recorded exception")
+            raise TranslateException('All retry attempts failed with no recorded exception')
 
 
 def with_retry(config: Optional[RetryConfig] = None, correlation_id_param: str = 'correlation_id'):

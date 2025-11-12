@@ -480,6 +480,7 @@ def map_aws_error(
 
     # Extract additional error details from AWS response
     from botocore.exceptions import ClientError
+
     details = {}
     # Check if it's a ClientError or has response attribute (for Mock objects in tests)
     if isinstance(aws_error, ClientError) or hasattr(aws_error, 'response'):

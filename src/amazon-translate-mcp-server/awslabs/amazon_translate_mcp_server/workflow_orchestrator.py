@@ -627,7 +627,7 @@ class WorkflowOrchestrator:
             if terminology_names:
                 context.current_step = 'validate_terminologies'
                 logger.debug(f'Step 2: Validating terminologies for workflow {workflow_id}')
-                
+
                 # Type narrowing: terminology_names is now List[str] (not Optional)
                 terminology_names_list: List[str] = terminology_names
 

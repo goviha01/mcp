@@ -343,7 +343,7 @@ class TestMCPToolErrorHandling:
             applied_terminologies=[],
         )
 
-        with patch.object(server, 'secure_translation_service') as mock_service:
+        with patch.object(server, 'translation_service') as mock_service:
             mock_service.translate_text.return_value = mock_result
 
             params = server.TranslateTextParams(

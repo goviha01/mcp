@@ -283,6 +283,8 @@ class TestHealthCheck:
             assert result['status'] == 'unhealthy'
             assert 'Credential error' in result['components']['aws_client']
             assert result['components']['translation_service'] == 'not_initialized'
+
+
 class TestServerMissingCoverage:
     """Tests to cover missing lines in server module."""
 
@@ -290,7 +292,7 @@ class TestServerMissingCoverage:
     def test_translate_text_service_not_initialized(self):
         """Test translate_text when translation service is not initialized."""
         from awslabs.amazon_translate_mcp_server.server import mcp
-        
+
         # Test that the server handles uninitialized service gracefully
         assert mcp is not None
 
@@ -298,7 +300,7 @@ class TestServerMissingCoverage:
     def test_detect_language_service_not_initialized(self):
         """Test detect_language when translation service is not initialized."""
         from awslabs.amazon_translate_mcp_server.server import mcp
-        
+
         # Test that the server handles uninitialized service gracefully
         assert mcp is not None
 
@@ -306,14 +308,14 @@ class TestServerMissingCoverage:
     def test_validate_translation_service_not_initialized(self):
         """Test validate_translation when translation service is not initialized."""
         from awslabs.amazon_translate_mcp_server.server import mcp
-        
+
         # Test that the server handles uninitialized service gracefully
         assert mcp is not None
 
     def test_health_check_services_not_initialized(self):
         """Test health_check when services are not initialized."""
         from awslabs.amazon_translate_mcp_server.server import health_check
-        
+
         # Test health check functionality
         result = health_check()
         assert isinstance(result, dict)
@@ -321,8 +323,7 @@ class TestServerMissingCoverage:
 
     def test_server_exception_handling(self):
         """Test server exception handling in tool functions."""
-        from unittest.mock import Mock
         from awslabs.amazon_translate_mcp_server.server import mcp
-        
+
         # Test that server is properly initialized
         assert mcp is not None

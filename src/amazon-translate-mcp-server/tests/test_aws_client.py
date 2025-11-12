@@ -511,6 +511,7 @@ class TestAWSClientManager:
         # Only one client should have been created
         assert len(manager._clients) == 1
 
+
 class TestAWSClientManagerEdgeCases:
     """Tests for AWS client manager edge cases."""
 
@@ -518,10 +519,10 @@ class TestAWSClientManagerEdgeCases:
     def test_validate_credentials_no_session(self, mock_session):
         """Test credential validation when session is not properly initialized."""
         from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
-        
+
         # Create manager but simulate session failure
-        mock_session.side_effect = Exception("Session initialization failed")
-        
+        mock_session.side_effect = Exception('Session initialization failed')
+
         with pytest.raises(Exception):
             AWSClientManager()
 
@@ -529,25 +530,25 @@ class TestAWSClientManagerEdgeCases:
     def test_client_creation_with_invalid_service(self, mock_session):
         """Test client creation with invalid service name."""
         from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
-        
+
         mock_sts_client = Mock()
         mock_sts_client.get_caller_identity.return_value = {
             'Account': '123456789012',
-            'Arn': 'arn:aws:iam::123456789012:user/test-user'
+            'Arn': 'arn:aws:iam::123456789012:user/test-user',
         }
-        
+
         def mock_client_factory(service, **kwargs):
             if service == 'sts':
                 return mock_sts_client
             elif service == 'invalid-service':
-                raise Exception("Invalid service")
+                raise Exception('Invalid service')
             else:
-                raise Exception("Unknown service")
-        
+                raise Exception('Unknown service')
+
         mock_session.return_value.client.side_effect = mock_client_factory
-        
+
         manager = AWSClientManager()
-        
+
         with pytest.raises(Exception):
             manager._get_client('invalid-service')
 
@@ -555,20 +556,20 @@ class TestAWSClientManagerEdgeCases:
     def test_session_region_handling(self, mock_session):
         """Test session region handling."""
         from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
-        
+
         mock_sts_client = Mock()
         mock_sts_client.get_caller_identity.return_value = {
             'Account': '123456789012',
-            'Arn': 'arn:aws:iam::123456789012:user/test-user'
+            'Arn': 'arn:aws:iam::123456789012:user/test-user',
         }
-        
+
         mock_session_instance = Mock()
         mock_session_instance.client.return_value = mock_sts_client
         mock_session_instance.region_name = None  # No region set
         mock_session.return_value = mock_session_instance
-        
+
         manager = AWSClientManager()
-        
+
         # Should handle missing region gracefully
         region = manager.get_region()
         assert region is None
@@ -577,26 +578,26 @@ class TestAWSClientManagerEdgeCases:
     def test_client_manager_cleanup(self, mock_session):
         """Test client manager cleanup functionality."""
         from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
-        
+
         mock_sts_client = Mock()
         mock_sts_client.get_caller_identity.return_value = {
             'Account': '123456789012',
-            'Arn': 'arn:aws:iam::123456789012:user/test-user'
+            'Arn': 'arn:aws:iam::123456789012:user/test-user',
         }
-        
+
         mock_translate_client = Mock()
         mock_translate_client.list_languages.return_value = {'Languages': []}
-        
+
         mock_session_instance = Mock()
         mock_session_instance.client.side_effect = [mock_sts_client, mock_translate_client]
         mock_session.return_value = mock_session_instance
-        
+
         manager = AWSClientManager()
-        
+
         # Create a client to populate cache
         manager.get_translate_client()
         assert len(manager._clients) > 0
-        
+
         # Test cleanup
         manager.close()
         assert len(manager._clients) == 0
@@ -605,21 +606,21 @@ class TestAWSClientManagerEdgeCases:
     def test_credential_refresh_scenarios(self, mock_session):
         """Test credential refresh scenarios."""
         from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
-        
+
         mock_sts_client = Mock()
         mock_sts_client.get_caller_identity.return_value = {
             'Account': '123456789012',
-            'Arn': 'arn:aws:iam::123456789012:user/test-user'
+            'Arn': 'arn:aws:iam::123456789012:user/test-user',
         }
-        
+
         mock_session_instance = Mock()
         mock_session_instance.client.return_value = mock_sts_client
         mock_session.return_value = mock_session_instance
-        
+
         manager = AWSClientManager()
-        
+
         # Test refresh credentials
         manager.refresh_credentials()
-        
+
         # Should clear client cache
         assert len(manager._clients) == 0

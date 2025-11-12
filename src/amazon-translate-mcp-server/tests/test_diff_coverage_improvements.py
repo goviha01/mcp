@@ -1,8 +1,6 @@
 """Focused tests to improve diff coverage for specific missing lines."""
 
 import pytest
-from unittest.mock import Mock, patch
-from botocore.exceptions import ClientError
 
 
 class TestRetryHandlerCoverage:
@@ -11,36 +9,36 @@ class TestRetryHandlerCoverage:
     def test_retry_config_calculate_delay_with_jitter_disabled(self):
         """Test retry config delay calculation without jitter."""
         from awslabs.amazon_translate_mcp_server.retry_handler import RetryConfig
-        
+
         config = RetryConfig(
             max_attempts=3,
             base_delay=1.0,
             max_delay=10.0,
             exponential_base=2.0,
-            jitter=False  # Disable jitter for predictable results
+            jitter=False,  # Disable jitter for predictable results
         )
-        
+
         # Test with retry_after override
         delay = config.calculate_delay(1, retry_after=5)
         assert delay == 5.0
-        
+
         # Test normal exponential backoff
         delay = config.calculate_delay(1)
-        expected = 1.0 * (2.0 ** 1)  # base_delay * exponential_base^attempt
+        expected = 1.0 * (2.0**1)  # base_delay * exponential_base^attempt
         assert delay == expected
 
     def test_retry_handler_no_exception_recorded(self):
         """Test retry handler when no exception is recorded."""
-        from awslabs.amazon_translate_mcp_server.retry_handler import RetryHandler, RetryConfig
         from awslabs.amazon_translate_mcp_server.exceptions import TranslateException
-        
+        from awslabs.amazon_translate_mcp_server.retry_handler import RetryConfig, RetryHandler
+
         config = RetryConfig(max_attempts=1)
         handler = RetryHandler(config)
-        
+
         def failing_function():
             # This will fail but we'll simulate no exception being recorded
-            raise Exception("Test error")
-        
+            raise Exception('Test error')
+
         # Test the actual retry method which should handle the case
         with pytest.raises((TranslateException, Exception)):
             handler.retry(failing_function)
@@ -51,28 +49,28 @@ class TestSecurityCoverage:
 
     def test_security_manager_with_non_string_input(self):
         """Test security manager with non-string input."""
-        from awslabs.amazon_translate_mcp_server.security import SecurityManager, SecurityConfig
         from awslabs.amazon_translate_mcp_server.exceptions import ValidationError
-        
+        from awslabs.amazon_translate_mcp_server.security import SecurityConfig, SecurityManager
+
         config = SecurityConfig(enable_pii_detection=True)
         manager = SecurityManager(config)
-        
+
         # Test with non-string input
-        with pytest.raises(ValidationError, match="text must be a string"):
+        with pytest.raises(ValidationError, match='text must be a string'):
             manager.validate_and_sanitize_text(123)
 
     def test_pii_detector_disabled(self):
         """Test PII detector when disabled."""
         from awslabs.amazon_translate_mcp_server.security import PIIDetector, SecurityConfig
-        
+
         config = SecurityConfig(enable_pii_detection=False)
         detector = PIIDetector(config)
-        
+
         # Test that detector still works even when disabled (it may still detect but not act on it)
         text = 'Contact john@example.com'
-        pii_found = detector.detect_pii(text)
+        detector.detect_pii(text)  # Just test that it doesn't crash when disabled
         # When disabled, it might still detect but not mask
-        
+
         result = detector.mask_pii(text)
         # The method might return a tuple (text, issues) or just text
         if isinstance(result, tuple):
@@ -84,24 +82,24 @@ class TestSecurityCoverage:
     def test_content_filter_disabled(self):
         """Test content filter when disabled."""
         from awslabs.amazon_translate_mcp_server.security import ContentFilter, SecurityConfig
-        
+
         config = SecurityConfig(enable_profanity_filter=False)
         filter_instance = ContentFilter(config)
-        
+
         text = 'This contains profanity'
         has_profanity = filter_instance.contains_profanity(text)
         assert not has_profanity  # Should return False when disabled
-        
+
         filtered_text = filter_instance.filter_profanity(text)
         assert filtered_text == text  # Should return original text when disabled
 
     def test_audit_logger_disabled(self):
         """Test audit logger when disabled."""
         from awslabs.amazon_translate_mcp_server.security import AuditLogger, SecurityConfig
-        
+
         config = SecurityConfig(enable_audit_logging=False)
         logger = AuditLogger(config)
-        
+
         # Should not raise any exceptions when disabled
         logger.log_translation('test', 'en', 'es', 'test result')
         # Just test that the logger can be created and basic method works
@@ -112,23 +110,29 @@ class TestExceptionsCoverage:
 
     def test_map_aws_error_with_botocore_error(self):
         """Test mapping BotoCoreError."""
-        from awslabs.amazon_translate_mcp_server.exceptions import map_aws_error, ServiceUnavailableError
+        from awslabs.amazon_translate_mcp_server.exceptions import (
+            ServiceUnavailableError,
+            map_aws_error,
+        )
         from botocore.exceptions import BotoCoreError
-        
+
         error = BotoCoreError()
         result = map_aws_error(error)
-        
+
         assert isinstance(result, ServiceUnavailableError)
         assert 'BotoCore error' in result.message
 
     def test_map_aws_error_without_response(self):
         """Test mapping AWS error without response attribute."""
-        from awslabs.amazon_translate_mcp_server.exceptions import map_aws_error, TranslateException
-        
+        from awslabs.amazon_translate_mcp_server.exceptions import (
+            TranslateException,
+            map_aws_error,
+        )
+
         # Create a generic exception without response attribute
-        error = Exception("Generic error")
+        error = Exception('Generic error')
         result = map_aws_error(error)
-        
+
         assert isinstance(result, TranslateException)
         assert result.error_code == 'UnknownError'
 
@@ -139,14 +143,12 @@ class TestModelsCoverage:
     def test_error_response_auto_fields(self):
         """Test ErrorResponse with auto-generated fields."""
         from awslabs.amazon_translate_mcp_server.models import ErrorResponse
-        
+
         # Test without providing optional fields
         error = ErrorResponse(
-            error_type='TestError',
-            error_code='TEST_001',
-            message='Test message'
+            error_type='TestError', error_code='TEST_001', message='Test message'
         )
-        
+
         # Should have the basic required fields
         assert error.error_type == 'TestError'
         assert error.error_code == 'TEST_001'
@@ -155,51 +157,53 @@ class TestModelsCoverage:
     def test_translation_result_validation_edge_cases(self):
         """Test TranslationResult validation edge cases."""
         from awslabs.amazon_translate_mcp_server.models import TranslationResult
-        
+
         # Test with confidence score at boundaries
         result = TranslationResult(
             translated_text='Test',
             source_language='en',
             target_language='es',
-            confidence_score=0.0  # Minimum valid value
+            confidence_score=0.0,  # Minimum valid value
         )
         assert result.confidence_score == 0.0
-        
+
         result = TranslationResult(
             translated_text='Test',
             source_language='en',
             target_language='es',
-            confidence_score=1.0  # Maximum valid value
+            confidence_score=1.0,  # Maximum valid value
         )
         assert result.confidence_score == 1.0
-        
+
         # Test with invalid confidence score
         with pytest.raises(ValueError, match='confidence_score must be between 0.0 and 1.0'):
             TranslationResult(
                 translated_text='Test',
                 source_language='en',
                 target_language='es',
-                confidence_score=1.5  # Invalid value
+                confidence_score=1.5,  # Invalid value
             )
 
     def test_language_detection_result_validation(self):
         """Test LanguageDetectionResult validation."""
         from awslabs.amazon_translate_mcp_server.models import LanguageDetectionResult
-        
+
         # Test with invalid alternative language
         with pytest.raises(ValueError, match='Alternative language code cannot be empty'):
             LanguageDetectionResult(
                 detected_language='en',
                 confidence_score=0.95,
-                alternative_languages=[('', 0.03)]  # Empty language code
+                alternative_languages=[('', 0.03)],  # Empty language code
             )
-        
+
         # Test with invalid alternative confidence score
-        with pytest.raises(ValueError, match='Alternative language confidence score must be between 0.0 and 1.0'):
+        with pytest.raises(
+            ValueError, match='Alternative language confidence score must be between 0.0 and 1.0'
+        ):
             LanguageDetectionResult(
                 detected_language='en',
                 confidence_score=0.95,
-                alternative_languages=[('es', 1.5)]  # Invalid confidence score
+                alternative_languages=[('es', 1.5)],  # Invalid confidence score
             )
 
 
@@ -209,31 +213,31 @@ class TestConfigCoverage:
     def test_server_config_validation_errors(self):
         """Test ServerConfig validation errors."""
         from awslabs.amazon_translate_mcp_server.config import ServerConfig
-        
+
         # Test invalid log level
         with pytest.raises(ValueError, match='Invalid log_level'):
             config = ServerConfig()
             config.log_level = 'INVALID'
             config.__post_init__()
-        
+
         # Test invalid max_text_length
         with pytest.raises(ValueError, match='max_text_length must be positive'):
             config = ServerConfig()
             config.max_text_length = -1
             config.__post_init__()
-        
+
         # Test invalid batch_timeout
         with pytest.raises(ValueError, match='batch_timeout must be positive'):
             config = ServerConfig()
             config.batch_timeout = -1
             config.__post_init__()
-        
+
         # Test invalid cache_ttl
         with pytest.raises(ValueError, match='cache_ttl cannot be negative'):
             config = ServerConfig()
             config.cache_ttl = -1
             config.__post_init__()
-        
+
         # Test invalid max_file_size
         with pytest.raises(ValueError, match='max_file_size must be positive'):
             config = ServerConfig()
@@ -246,11 +250,11 @@ class TestLoggingConfigCoverage:
 
     def test_correlation_id_filter_with_record_correlation_id(self):
         """Test CorrelationIdFilter with correlation_id in record."""
-        from awslabs.amazon_translate_mcp_server.logging_config import CorrelationIdFilter
         import logging
-        
+        from awslabs.amazon_translate_mcp_server.logging_config import CorrelationIdFilter
+
         filter_instance = CorrelationIdFilter()
-        
+
         # Create a record with correlation_id
         record = logging.LogRecord(
             name='test',
@@ -259,27 +263,28 @@ class TestLoggingConfigCoverage:
             lineno=1,
             msg='Test message',
             args=(),
-            exc_info=None
+            exc_info=None,
         )
         record.correlation_id = 'test-correlation-123'
-        
+
         result = filter_instance.filter(record)
         assert result is True
         assert record.correlation_id == 'test-correlation-123'
 
     def test_structured_formatter_with_exception(self):
         """Test StructuredFormatter with exception info."""
-        from awslabs.amazon_translate_mcp_server.logging_config import StructuredFormatter
         import logging
-        
+        from awslabs.amazon_translate_mcp_server.logging_config import StructuredFormatter
+
         formatter = StructuredFormatter()
-        
+
         try:
-            raise ValueError("Test exception")
+            raise ValueError('Test exception')
         except ValueError:
             import sys
+
             exc_info = sys.exc_info()
-        
+
         record = logging.LogRecord(
             name='test',
             level=logging.ERROR,
@@ -287,9 +292,9 @@ class TestLoggingConfigCoverage:
             lineno=1,
             msg='Test message with exception',
             args=(),
-            exc_info=exc_info
+            exc_info=exc_info,
         )
-        
+
         formatted = formatter.format(record)
         assert 'Test message with exception' in formatted
         assert 'ValueError' in formatted
@@ -302,31 +307,31 @@ class TestSimpleModelTests:
     def test_batch_input_config_validation(self):
         """Test BatchInputConfig validation."""
         from awslabs.amazon_translate_mcp_server.models import BatchInputConfig
-        
+
         # Test with invalid S3 URI
         with pytest.raises(ValueError, match="s3_uri must start with 's3://'"):
             BatchInputConfig(
                 s3_uri='invalid-uri',
                 content_type='text/plain',
-                data_access_role_arn='arn:aws:iam::123456789012:role/test'
+                data_access_role_arn='arn:aws:iam::123456789012:role/test',
             )
-        
+
         # Test with invalid ARN
         with pytest.raises(ValueError, match='data_access_role_arn must be a valid IAM role ARN'):
             BatchInputConfig(
                 s3_uri='s3://test-bucket/input/',
                 content_type='text/plain',
-                data_access_role_arn='invalid-arn'
+                data_access_role_arn='invalid-arn',
             )
 
     def test_terminology_data_edge_cases(self):
         """Test TerminologyData edge cases."""
         from awslabs.amazon_translate_mcp_server.models import TerminologyData
-        
+
         # Test with empty terminology data
         with pytest.raises(ValueError, match='terminology_data cannot be empty'):
             TerminologyData(
                 terminology_data=b'',  # Empty data
                 format='CSV',
-                directionality='UNI'
+                directionality='UNI',
             )

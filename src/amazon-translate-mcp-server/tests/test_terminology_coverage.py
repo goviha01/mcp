@@ -4,17 +4,16 @@ This module contains targeted tests to improve coverage for terminology_manager.
 focusing on file handling, validation, and error scenarios.
 """
 
+import os
 import pytest
 import tempfile
-import os
-from unittest.mock import Mock, patch, mock_open
-from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 from awslabs.amazon_translate_mcp_server.exceptions import (
     TerminologyError,
     ValidationError,
-    ServiceUnavailableError
 )
+from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 from botocore.exceptions import ClientError
+from unittest.mock import Mock, patch
 
 
 class TestTerminologyFileHandling:
@@ -25,16 +24,16 @@ class TestTerminologyFileHandling:
         """Test successful CSV file validation."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Create a temporary CSV file with valid content
-        csv_content = "en,es,fr\nhello,hola,bonjour\nworld,mundo,monde"
-        
+        csv_content = 'en,es,fr\nhello,hola,bonjour\nworld,mundo,monde'
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             f.write(csv_content)
             temp_file = f.name
-        
+
         try:
             # Should not raise an exception
             terminology_manager.validate_csv_file(temp_file)
@@ -46,11 +45,11 @@ class TestTerminologyFileHandling:
         """Test successful TMX file validation."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Create a temporary TMX file with valid content
-        tmx_content = '''<?xml version="1.0" encoding="UTF-8"?>
+        tmx_content = """<?xml version="1.0" encoding="UTF-8"?>
         <tmx version="1.4">
             <header>
                 <prop type="x-filename">test.tmx</prop>
@@ -65,12 +64,12 @@ class TestTerminologyFileHandling:
                     </tuv>
                 </tu>
             </body>
-        </tmx>'''
-        
+        </tmx>"""
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.tmx', delete=False) as f:
             f.write(tmx_content)
             temp_file = f.name
-        
+
         try:
             # Should not raise an exception
             terminology_manager.validate_tmx_file(temp_file)
@@ -82,16 +81,16 @@ class TestTerminologyFileHandling:
         """Test file format detection edge cases."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Test case insensitive detection
         assert terminology_manager.detect_file_format('test.CSV') == 'CSV'
         assert terminology_manager.detect_file_format('test.TMX') == 'TMX'
-        
+
         # Test with multiple extensions
         assert terminology_manager.detect_file_format('test.backup.csv') == 'CSV'
-        
+
         # Test with no extension
         with pytest.raises(TerminologyError):
             terminology_manager.detect_file_format('test')
@@ -101,16 +100,16 @@ class TestTerminologyFileHandling:
         """Test file size validation."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Create a large file that exceeds limits
-        large_content = "en,es\n" + "word,palabra\n" * 100000  # Very large file
-        
+        large_content = 'en,es\n' + 'word,palabra\n' * 100000  # Very large file
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             f.write(large_content)
             temp_file = f.name
-        
+
         try:
             # Should handle large files appropriately
             terminology_manager.validate_csv_file(temp_file)
@@ -129,18 +128,18 @@ class TestTerminologyValidationEdgeCases:
         """Test terminology name validation edge cases."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Test with None
         with pytest.raises(ValidationError):
             terminology_manager.validate_terminology_name(None)
-        
+
         # Test with very long name
         long_name = 'a' * 300  # Very long name
         with pytest.raises(ValidationError):
             terminology_manager.validate_terminology_name(long_name)
-        
+
         # Test with invalid characters
         with pytest.raises(ValidationError):
             terminology_manager.validate_terminology_name('invalid@name')
@@ -150,17 +149,17 @@ class TestTerminologyValidationEdgeCases:
         """Test language code validation edge cases."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Test with None
         with pytest.raises(ValidationError):
             terminology_manager.validate_language_code(None)
-        
+
         # Test with empty string
         with pytest.raises(ValidationError):
             terminology_manager.validate_language_code('')
-        
+
         # Test with invalid format
         with pytest.raises(ValidationError):
             terminology_manager.validate_language_code('invalid-lang-code')
@@ -170,13 +169,13 @@ class TestTerminologyValidationEdgeCases:
         """Test S3 URI validation."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Test valid S3 URIs
         assert terminology_manager.validate_s3_uri('s3://bucket/key')
         assert terminology_manager.validate_s3_uri('s3://bucket/folder/file.csv')
-        
+
         # Test invalid S3 URIs
         assert not terminology_manager.validate_s3_uri('http://example.com')
         assert not terminology_manager.validate_s3_uri('bucket/key')
@@ -192,16 +191,16 @@ class TestTerminologyErrorHandling:
         """Test AWS client error handling."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         mock_translate_client = Mock()
         mock_translate_client.list_terminologies.side_effect = ClientError(
             error_response={'Error': {'Code': 'AccessDenied', 'Message': 'Access denied'}},
-            operation_name='ListTerminologies'
+            operation_name='ListTerminologies',
         )
         mock_client_instance._get_client.return_value = mock_translate_client
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         with pytest.raises(Exception):
             terminology_manager.list_terminologies()
 
@@ -210,16 +209,18 @@ class TestTerminologyErrorHandling:
         """Test terminology not found error handling."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         mock_translate_client = Mock()
         mock_translate_client.get_terminology.side_effect = ClientError(
-            error_response={'Error': {'Code': 'ResourceNotFoundException', 'Message': 'Terminology not found'}},
-            operation_name='GetTerminology'
+            error_response={
+                'Error': {'Code': 'ResourceNotFoundException', 'Message': 'Terminology not found'}
+            },
+            operation_name='GetTerminology',
         )
         mock_client_instance._get_client.return_value = mock_translate_client
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         with pytest.raises(Exception):
             terminology_manager.get_terminology('nonexistent-terminology')
 
@@ -228,22 +229,27 @@ class TestTerminologyErrorHandling:
         """Test terminology limit exceeded error handling."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         mock_translate_client = Mock()
         mock_translate_client.import_terminology.side_effect = ClientError(
-            error_response={'Error': {'Code': 'LimitExceededException', 'Message': 'Terminology limit exceeded'}},
-            operation_name='ImportTerminology'
+            error_response={
+                'Error': {
+                    'Code': 'LimitExceededException',
+                    'Message': 'Terminology limit exceeded',
+                }
+            },
+            operation_name='ImportTerminology',
         )
         mock_client_instance._get_client.return_value = mock_translate_client
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         with pytest.raises(Exception):
             terminology_manager.import_terminology(
                 name='test-terminology',
                 file_path='/tmp/test.csv',
                 source_language='en',
-                target_languages=['es']
+                target_languages=['es'],
             )
 
 
@@ -255,34 +261,34 @@ class TestTerminologyOperationsEdgeCases:
         """Test terminology creation with minimal data."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         mock_translate_client = Mock()
         mock_translate_client.import_terminology.return_value = {
             'TerminologyProperties': {
                 'Name': 'test-terminology',
                 'SourceLanguageCode': 'en',
-                'TargetLanguageCodes': ['es']
+                'TargetLanguageCodes': ['es'],
             }
         }
         mock_client_instance._get_client.return_value = mock_translate_client
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Create minimal CSV content
-        csv_content = "en,es\nhello,hola"
-        
+        csv_content = 'en,es\nhello,hola'
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             f.write(csv_content)
             temp_file = f.name
-        
+
         try:
             result = terminology_manager.import_terminology(
                 name='test-terminology',
                 file_path=temp_file,
                 source_language='en',
-                target_languages=['es']
+                target_languages=['es'],
             )
-            
+
             assert result['TerminologyProperties']['Name'] == 'test-terminology'
         finally:
             os.unlink(temp_file)
@@ -292,34 +298,34 @@ class TestTerminologyOperationsEdgeCases:
         """Test terminology update scenarios."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         mock_translate_client = Mock()
         mock_translate_client.import_terminology.return_value = {
             'TerminologyProperties': {
                 'Name': 'existing-terminology',
                 'SourceLanguageCode': 'en',
-                'TargetLanguageCodes': ['es', 'fr']
+                'TargetLanguageCodes': ['es', 'fr'],
             }
         }
         mock_client_instance._get_client.return_value = mock_translate_client
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Test updating existing terminology
-        csv_content = "en,es,fr\nhello,hola,bonjour\nworld,mundo,monde"
-        
+        csv_content = 'en,es,fr\nhello,hola,bonjour\nworld,mundo,monde'
+
         with tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False) as f:
             f.write(csv_content)
             temp_file = f.name
-        
+
         try:
             result = terminology_manager.import_terminology(
                 name='existing-terminology',
                 file_path=temp_file,
                 source_language='en',
-                target_languages=['es', 'fr']
+                target_languages=['es', 'fr'],
             )
-            
+
             assert 'fr' in result['TerminologyProperties']['TargetLanguageCodes']
         finally:
             os.unlink(temp_file)
@@ -329,17 +335,17 @@ class TestTerminologyOperationsEdgeCases:
         """Test terminology deletion scenarios."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         mock_translate_client = Mock()
         mock_translate_client.delete_terminology.return_value = {}
         mock_client_instance._get_client.return_value = mock_translate_client
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Test successful deletion
         result = terminology_manager.delete_terminology('test-terminology')
         assert result == {}
-        
+
         # Verify delete was called
         mock_translate_client.delete_terminology.assert_called_with(Name='test-terminology')
 
@@ -352,29 +358,21 @@ class TestTerminologyUtilities:
         """Test terminology statistics functionality."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         mock_translate_client = Mock()
         mock_translate_client.list_terminologies.return_value = {
             'TerminologyPropertiesList': [
-                {
-                    'Name': 'terminology1',
-                    'TermCount': 100,
-                    'SizeBytes': 1024
-                },
-                {
-                    'Name': 'terminology2',
-                    'TermCount': 200,
-                    'SizeBytes': 2048
-                }
+                {'Name': 'terminology1', 'TermCount': 100, 'SizeBytes': 1024},
+                {'Name': 'terminology2', 'TermCount': 200, 'SizeBytes': 2048},
             ]
         }
         mock_client_instance._get_client.return_value = mock_translate_client
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Test getting terminology statistics
         stats = terminology_manager.get_terminology_statistics()
-        
+
         assert stats['total_terminologies'] == 2
         assert stats['total_terms'] == 300
         assert stats['total_size_bytes'] == 3072
@@ -384,21 +382,21 @@ class TestTerminologyUtilities:
         """Test terminology search functionality."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
-        
+
         mock_translate_client = Mock()
         mock_translate_client.list_terminologies.return_value = {
             'TerminologyPropertiesList': [
                 {'Name': 'medical-terms'},
                 {'Name': 'legal-terms'},
-                {'Name': 'technical-terms'}
+                {'Name': 'technical-terms'},
             ]
         }
         mock_client_instance._get_client.return_value = mock_translate_client
-        
+
         terminology_manager = TerminologyManager(mock_client_instance)
-        
+
         # Test searching terminologies by name pattern
         results = terminology_manager.search_terminologies('medical')
-        
+
         assert len(results) == 1
         assert results[0]['Name'] == 'medical-terms'

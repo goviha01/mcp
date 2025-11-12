@@ -244,13 +244,26 @@ class TestTerminologyErrorHandling:
 
         terminology_manager = TerminologyManager(mock_client_instance)
 
-        with pytest.raises(Exception):
-            terminology_manager.import_terminology(
-                name='test-terminology',
-                file_path='/tmp/test.csv',
-                source_language='en',
-                target_languages=['es'],
-            )
+        # Use secure temporary file instead of hardcoded /tmp/
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as temp_file:
+            temp_path = temp_file.name
+
+        try:
+            with pytest.raises(Exception):
+                terminology_manager.import_terminology(
+                    name='test-terminology',
+                    file_path=temp_path,
+                    source_language='en',
+                    target_languages=['es'],
+                )
+        finally:
+            # Clean up the temporary file
+            import os
+
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
 
 
 class TestTerminologyOperationsEdgeCases:

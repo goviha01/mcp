@@ -43,6 +43,7 @@ dependencies = [
     "pydantic>=2.0.0",
     "fastmcp>=2.13.0.2",
     "defusedxml>=0.7.1",
+    "starlette>=0.50.0",
 ]
 
 [project.scripts]

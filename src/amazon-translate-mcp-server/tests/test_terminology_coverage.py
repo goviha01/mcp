@@ -374,3 +374,56 @@ class TestTerminologyUtilities:
         tmx_content = b'<?xml version="1.0"?><tmx><body></body></tmx>'
         tmx_format = terminology_manager._detect_file_format(Path('test.tmx'), tmx_content)
         assert tmx_format == 'TMX'
+
+
+class TestTerminologyAdvancedOperations:
+    """Test advanced terminology operations."""
+
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_basic_operations(self, mock_aws_client):
+        """Test basic terminology operations."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.get_terminology.return_value = {
+            'TerminologyProperties': {
+                'Name': 'test-terminology',
+                'SourceLanguageCode': 'en',
+                'TargetLanguageCodes': ['es'],
+                'TermCount': 10,
+            }
+        }
+        terminology_manager = TerminologyManager(mock_client_instance)
+        terminology_manager._translate_client = mock_translate_client
+
+        # Test getting terminology
+        result = terminology_manager.get_terminology('test-terminology')
+        assert result.name == 'test-terminology'
+        assert result.source_language == 'en'
+        assert result.target_languages == ['es']
+
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_list_operations(self, mock_aws_client):
+        """Test terminology list operations."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.list_terminologies.return_value = {
+            'TerminologyPropertiesList': [
+                {
+                    'Name': 'term1',
+                    'SourceLanguageCode': 'en',
+                    'TargetLanguageCodes': ['es'],
+                    'TermCount': 10,
+                }
+            ]
+        }
+        terminology_manager = TerminologyManager(mock_client_instance)
+        terminology_manager._translate_client = mock_translate_client
+
+        # Test listing terminologies
+        result = terminology_manager.list_terminologies()
+        assert len(result['terminologies']) == 1
+        assert result['terminologies'][0].name == 'term1'

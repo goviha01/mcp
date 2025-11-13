@@ -313,3 +313,68 @@ class TestLanguageOperationsPerformance:
 
         # AWS should only be called once due to caching
         assert mock_translate_client.list_languages.call_count == 1
+
+
+class TestLanguageOperationsAdvancedFeatures:
+    """Test advanced language operations features."""
+
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_operations_initialization_advanced(self, mock_aws_client):
+        """Test advanced language operations initialization."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        lang_ops = LanguageOperations(mock_client_instance)
+
+        # Test initialization properties
+        assert lang_ops.aws_client_manager == mock_client_instance
+        assert lang_ops._language_cache is None
+        assert lang_ops._cache_timestamp is None
+
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_pair_basic_functionality(self, mock_aws_client):
+        """Test basic language pair functionality."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.list_languages.return_value = {
+            'Languages': [
+                {'LanguageCode': 'en'},
+                {'LanguageCode': 'es'},
+                {'LanguageCode': 'fr'},
+            ]
+        }
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        lang_ops = LanguageOperations(mock_client_instance)
+
+        # Test basic language pair generation
+        pairs = lang_ops.list_language_pairs()
+        assert isinstance(pairs, list)
+        assert len(pairs) > 0
+
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_name_lookup_functionality(self, mock_aws_client):
+        """Test language name lookup functionality."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        lang_ops = LanguageOperations(mock_client_instance)
+
+        # Test with cached data
+        lang_ops._language_cache = {
+            'languages': [
+                {'LanguageCode': 'en', 'LanguageName': 'English'},
+                {'LanguageCode': 'es', 'LanguageName': 'Spanish'},
+            ]
+        }
+        from datetime import datetime
+        lang_ops._cache_timestamp = datetime.utcnow()
+
+        # Test successful lookup
+        assert lang_ops.get_language_name('en') == 'English'
+        assert lang_ops.get_language_name('es') == 'Spanish'
+        
+        # Test non-existent language
+        assert lang_ops.get_language_name('xyz') is None

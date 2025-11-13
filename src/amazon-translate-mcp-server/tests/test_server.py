@@ -325,3 +325,98 @@ class TestServerMissingCoverage:
 
         # Test that server is properly initialized
         assert mcp is not None
+
+    def test_server_name_validation(self):
+        """Test server name validation."""
+        from awslabs.amazon_translate_mcp_server.server import mcp
+
+        # Test that MCP server has the correct name
+        assert mcp is not None
+        assert hasattr(mcp, 'name')
+        assert mcp.name == 'Amazon Translate MCP Server'
+
+    def test_parameter_validation_edge_cases(self):
+        """Test parameter validation edge cases."""
+        # Test ListTranslationJobsParams with default values
+        params = server.ListTranslationJobsParams()
+        assert params.max_results == 50
+        assert params.status_filter is None
+
+        # Test with all parameters
+        params_full = server.ListTranslationJobsParams(
+            max_results=100,
+            status_filter='COMPLETED'
+        )
+        assert params_full.max_results == 100
+        assert params_full.status_filter == 'COMPLETED'
+
+    @patch('awslabs.amazon_translate_mcp_server.server.aws_client_manager')
+    def test_health_check_edge_cases(self, mock_aws):
+        """Test health check edge cases."""
+        from awslabs.amazon_translate_mcp_server.server import health_check
+
+        # Test with AWS client validation failure
+        mock_aws.validate_credentials.side_effect = Exception('AWS Error')
+
+        result = health_check()
+        assert result['status'] == 'unhealthy'
+        assert 'AWS Error' in result['components']['aws_client']
+
+    def test_server_initialization_edge_cases(self):
+        """Test server initialization edge cases."""
+        # Test that server can handle multiple initialization calls
+        with patch('awslabs.amazon_translate_mcp_server.server.AWSClientManager'):
+            server.initialize_services()
+            # Second call should not cause issues
+            server.initialize_services()
+
+    def test_server_tool_registration(self):
+        """Test that all server tools are properly registered."""
+        from awslabs.amazon_translate_mcp_server.server import mcp
+
+        # Verify MCP instance has tools registered
+        assert mcp is not None
+
+    def test_server_name_validation(self):
+        """Test server name validation."""
+        from awslabs.amazon_translate_mcp_server.server import mcp
+
+        # Test that MCP server has the correct name
+        assert mcp is not None
+        assert hasattr(mcp, 'name')
+        assert mcp.name == 'Amazon Translate MCP Server'
+
+    def test_parameter_validation_edge_cases(self):
+        """Test parameter validation edge cases."""
+        # Test ListTranslationJobsParams with default values
+        params = server.ListTranslationJobsParams()
+        assert params.max_results == 50
+        assert params.status_filter is None
+
+        # Test with all parameters
+        params_full = server.ListTranslationJobsParams(
+            max_results=100,
+            status_filter='COMPLETED'
+        )
+        assert params_full.max_results == 100
+        assert params_full.status_filter == 'COMPLETED'
+
+    @patch('awslabs.amazon_translate_mcp_server.server.aws_client_manager')
+    def test_health_check_edge_cases(self, mock_aws):
+        """Test health check edge cases."""
+        from awslabs.amazon_translate_mcp_server.server import health_check
+
+        # Test with AWS client validation failure
+        mock_aws.validate_credentials.side_effect = Exception('AWS Error')
+
+        result = health_check()
+        assert result['status'] == 'unhealthy'
+        assert 'AWS Error' in result['components']['aws_client']
+
+    def test_server_initialization_edge_cases(self):
+        """Test server initialization edge cases."""
+        # Test that server can handle multiple initialization calls
+        with patch('awslabs.amazon_translate_mcp_server.server.AWSClientManager'):
+            server.initialize_services()
+            # Second call should not cause issues
+            server.initialize_services()

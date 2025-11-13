@@ -434,27 +434,33 @@ class TestTerminologyAdvancedOperations:
 
 
 class TestTerminologyRealCode:
-    """Test terminology manager with real code (no mocking)."""
+    """Test terminology manager with mocked AWS client."""
 
-    def test_terminology_manager_real_initialization(self):
-        """Test real terminology manager initialization."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_real_initialization(self, mock_aws_client):
+        """Test terminology manager initialization with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
         # Test initialization with AWS client manager
-        aws_client_manager = AWSClientManager()
-        terminology_manager = TerminologyManager(aws_client_manager)
+        terminology_manager = TerminologyManager(mock_client_instance)
         assert terminology_manager is not None
         assert terminology_manager._translate_client is None
         assert terminology_manager._aws_client_manager is not None
 
-    def test_terminology_validation_methods_real(self):
-        """Test real terminology validation methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_validation_methods_real(self, mock_aws_client):
+        """Test terminology validation methods with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
-        terminology_manager = TerminologyManager(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        terminology_manager = TerminologyManager(mock_client_instance)
 
         # Test name validation
         terminology_manager._validate_terminology_name('valid-name')
@@ -468,13 +474,16 @@ class TestTerminologyRealCode:
         terminology_manager._validate_language_code('en', 'source_language')
         terminology_manager._validate_language_code('es-ES', 'target_language')
 
-    def test_terminology_constants_real(self):
-        """Test real terminology constants."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_constants_real(self, mock_aws_client):
+        """Test terminology constants with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
-        terminology_manager = TerminologyManager(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        terminology_manager = TerminologyManager(mock_client_instance)
 
         # Test that the manager was created successfully
         assert terminology_manager is not None
@@ -485,15 +494,18 @@ class TestTerminologyRealCode:
         assert hasattr(terminology_manager, '_validate_terminology_description')
         assert hasattr(terminology_manager, '_validate_language_code')
 
-    def test_terminology_file_handling_real(self):
-        """Test real terminology file handling."""
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_file_handling_real(self, mock_aws_client):
+        """Test terminology file handling with mocked AWS client."""
         import os
         import tempfile
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
-        terminology_manager = TerminologyManager(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        terminology_manager = TerminologyManager(mock_client_instance)
 
         # Create a temporary CSV file
         csv_content = 'en,es\nhello,hola\nworld,mundo'
@@ -513,13 +525,16 @@ class TestTerminologyRealCode:
         finally:
             os.unlink(temp_file)
 
-    def test_terminology_error_handling_real(self):
-        """Test real terminology error handling."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_error_handling_real(self, mock_aws_client):
+        """Test terminology error handling with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
-        terminology_manager = TerminologyManager(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        terminology_manager = TerminologyManager(mock_client_instance)
 
         # Test that validation methods exist and are callable
         assert hasattr(terminology_manager, '_validate_terminology_name')
@@ -531,13 +546,16 @@ class TestTerminologyRealCode:
         terminology_manager._validate_terminology_name('valid-name')
         terminology_manager._validate_language_code('en', 'source_language')
 
-    def test_terminology_utility_methods_real(self):
-        """Test real terminology utility methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_utility_methods_real(self, mock_aws_client):
+        """Test terminology utility methods with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
-        terminology_manager = TerminologyManager(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        terminology_manager = TerminologyManager(mock_client_instance)
 
         # Test utility methods if they exist
         if hasattr(terminology_manager, '_format_terminology_response'):
@@ -555,12 +573,16 @@ class TestTerminologyRealCode:
 class TestTerminologyManagerAdvancedCoverage:
     """Advanced tests to improve terminology manager coverage."""
 
-    def test_terminology_manager_get_translate_client(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_get_translate_client(self, mock_aws_client):
         """Test getting translate client."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test getting translate client
@@ -571,12 +593,16 @@ class TestTerminologyManagerAdvancedCoverage:
         client2 = terminology_manager._get_translate_client()
         assert client is client2
 
-    def test_terminology_manager_validation_edge_cases(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_validation_edge_cases(self, mock_aws_client):
         """Test validation edge cases."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test valid terminology names
@@ -588,12 +614,16 @@ class TestTerminologyManagerAdvancedCoverage:
         assert hasattr(terminology_manager, '_validate_terminology_name')
         assert callable(terminology_manager._validate_terminology_name)
 
-    def test_terminology_manager_description_validation(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_description_validation(self, mock_aws_client):
         """Test description validation."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test valid descriptions
@@ -606,12 +636,16 @@ class TestTerminologyManagerAdvancedCoverage:
         assert hasattr(terminology_manager, '_validate_terminology_description')
         assert callable(terminology_manager._validate_terminology_description)
 
-    def test_terminology_manager_language_code_validation(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_language_code_validation(self, mock_aws_client):
         """Test language code validation."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test valid language codes
@@ -625,13 +659,17 @@ class TestTerminologyManagerAdvancedCoverage:
         assert hasattr(terminology_manager, '_validate_language_code')
         assert callable(terminology_manager._validate_language_code)
 
-    def test_terminology_data_validation_comprehensive(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_data_validation_comprehensive(self, mock_aws_client):
         """Test comprehensive terminology data validation."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.models import TerminologyData
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test valid CSV data
@@ -657,12 +695,16 @@ class TestTerminologyManagerAdvancedCoverage:
         assert hasattr(terminology_manager, '_validate_terminology_data')
         assert callable(terminology_manager._validate_terminology_data)
 
-    def test_terminology_manager_format_response(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_format_response(self, mock_aws_client):
         """Test response formatting methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test formatting terminology response
@@ -680,12 +722,16 @@ class TestTerminologyManagerAdvancedCoverage:
             result = terminology_manager._format_terminology_response(sample_response)
             assert result is not None
 
-    def test_terminology_manager_error_handling_methods(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_error_handling_methods(self, mock_aws_client):
         """Test error handling helper methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test error handling methods if they exist
@@ -708,12 +754,16 @@ class TestTerminologyManagerAdvancedCoverage:
             except (ValidationError, ValueError):
                 pass  # Expected
 
-    def test_terminology_manager_utility_methods(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_utility_methods(self, mock_aws_client):
         """Test utility methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test utility methods if they exist
@@ -737,12 +787,16 @@ class TestTerminologyManagerAdvancedCoverage:
             )
             assert isinstance(request, dict)
 
-    def test_terminology_manager_constants_and_limits(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_constants_and_limits(self, mock_aws_client):
         """Test constants and limits."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test that manager has reasonable limits
@@ -756,12 +810,16 @@ class TestTerminologyManagerAdvancedCoverage:
             assert isinstance(terminology_manager.SUPPORTED_FORMATS, (list, tuple, set))
             assert len(terminology_manager.SUPPORTED_FORMATS) > 0
 
-    def test_terminology_manager_xml_parsing_fallback(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_xml_parsing_fallback(self, mock_aws_client):
         """Test XML parsing with fallback."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test XML parsing methods if they exist
@@ -779,12 +837,16 @@ class TestTerminologyManagerAdvancedCoverage:
             except Exception:
                 pass  # Expected to fail for invalid XML
 
-    def test_terminology_manager_edge_case_operations(self):
+    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
+    def test_terminology_manager_edge_case_operations(self, mock_aws_client):
         """Test edge case operations."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test edge cases for various operations

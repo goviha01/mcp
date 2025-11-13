@@ -1135,25 +1135,33 @@ class TestTranslationServiceEdgeCases:
 class TestTranslationServiceRealCode:
     """Test translation service with real code (no mocking)."""
 
-    def test_translation_service_real_initialization(self):
-        """Test real translation service initialization."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translation_service_real_initialization(self, mock_aws_client):
+        """Test translation service initialization with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
 
         # Test initialization with AWS client manager
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         translation_service = TranslationService(aws_client_manager)
         assert translation_service is not None
         assert translation_service._aws_client_manager is not None
         assert translation_service._max_text_length == 10000
         assert translation_service._max_retries == 3
 
-    def test_translation_service_constants_real(self):
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translation_service_constants_real(self, mock_aws_client):
         """Test real translation service constants."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         translation_service = TranslationService(aws_client_manager)
 
         # Test instance attributes exist
@@ -1166,12 +1174,16 @@ class TestTranslationServiceRealCode:
         assert translation_service._max_text_length > 0
         assert translation_service._max_retries > 0
 
-    def test_translation_service_validation_real(self):
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translation_service_validation_real(self, mock_aws_client):
         """Test real translation service validation."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         translation_service = TranslationService(aws_client_manager)
 
         # Test that the service has the translate_text method
@@ -1184,12 +1196,16 @@ class TestTranslationServiceRealCode:
         assert translation_service._base_delay == 1.0
         assert translation_service._max_delay == 60.0
 
-    def test_translation_service_language_validation_real(self):
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translation_service_language_validation_real(self, mock_aws_client):
         """Test real translation service language validation."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         translation_service = TranslationService(aws_client_manager)
 
         # Test that the service has methods for translation operations
@@ -1202,12 +1218,16 @@ class TestTranslationServiceRealCode:
         assert callable(translation_service.detect_language)
         assert callable(translation_service.validate_translation)
 
-    def test_translation_service_content_type_validation_real(self):
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translation_service_content_type_validation_real(self, mock_aws_client):
         """Test real translation service content type validation."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         translation_service = TranslationService(aws_client_manager)
 
         # Test content type validation
@@ -1215,12 +1235,16 @@ class TestTranslationServiceRealCode:
             translation_service._validate_content_type('text/plain')
             translation_service._validate_content_type('text/html')
 
-    def test_translation_service_utility_methods_real(self):
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translation_service_utility_methods_real(self, mock_aws_client):
         """Test real translation service utility methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         translation_service = TranslationService(aws_client_manager)
 
         # Test utility methods if they exist
@@ -1239,12 +1263,16 @@ class TestTranslationServiceRealCode:
             confidence = translation_service._detect_language_confidence(sample_data)
             assert isinstance(confidence, (int, float))
 
-    def test_translation_service_error_handling_real(self):
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translation_service_error_handling_real(self, mock_aws_client):
         """Test real translation service error handling."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         translation_service = TranslationService(aws_client_manager)
 
         # Test graceful handling of edge cases
@@ -1255,12 +1283,16 @@ class TestTranslationServiceRealCode:
             except Exception:
                 pass  # Method might re-raise or transform errors
 
-    def test_translation_service_private_methods_real(self):
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translation_service_private_methods_real(self, mock_aws_client):
         """Test real translation service private methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
 
-        aws_client_manager = AWSClientManager()
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        aws_client_manager = mock_client_instance
         translation_service = TranslationService(aws_client_manager)
 
         # Test private helper methods if they exist

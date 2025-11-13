@@ -378,26 +378,32 @@ class TestLanguageOperationsAdvancedFeatures:
 class TestLanguageOperationsRealCode:
     """Test language operations with real code (no mocking)."""
 
-    def test_language_operations_real_initialization(self):
-        """Test real language operations initialization."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_operations_real_initialization(self, mock_aws_client):
+        """Test language operations initialization with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
 
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
         # Test initialization with AWS client manager
-        aws_client_manager = AWSClientManager()
-        lang_ops = LanguageOperations(aws_client_manager)
+        lang_ops = LanguageOperations(mock_client_instance)
         assert lang_ops is not None
         assert lang_ops.aws_client_manager is not None
         assert lang_ops._language_cache is None
         assert lang_ops._cache_timestamp is None
 
-    def test_language_operations_constants_real(self):
-        """Test real language operations constants."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_operations_constants_real(self, mock_aws_client):
+        """Test language operations constants with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
 
-        aws_client_manager = AWSClientManager()
-        lang_ops = LanguageOperations(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        lang_ops = LanguageOperations(mock_client_instance)
 
         # Test constants exist
         assert hasattr(lang_ops, 'SUPPORTED_FORMATS')
@@ -408,14 +414,17 @@ class TestLanguageOperationsRealCode:
         assert len(lang_ops.SUPPORTED_FORMATS) > 0
         assert isinstance(lang_ops.NO_TERMINOLOGY_LANGUAGES, set)
 
-    def test_language_operations_cache_real(self):
-        """Test real language operations cache functionality."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_operations_cache_real(self, mock_aws_client):
+        """Test language operations cache functionality with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
         from datetime import datetime, timedelta
 
-        aws_client_manager = AWSClientManager()
-        lang_ops = LanguageOperations(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        lang_ops = LanguageOperations(mock_client_instance)
 
         # Test cache validity checking
         assert not lang_ops._is_cache_valid()  # Should be False initially
@@ -429,15 +438,18 @@ class TestLanguageOperationsRealCode:
         lang_ops._cache_timestamp = datetime.utcnow() - timedelta(hours=25)  # Older than 24h TTL
         assert not lang_ops._is_cache_valid()  # Should be False for old cache
 
-    def test_language_operations_validation_real(self):
-        """Test real language operations validation."""
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_operations_validation_real(self, mock_aws_client):
+        """Test language operations validation with mocked AWS client."""
         import pytest
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.exceptions import ValidationError
         from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
 
-        aws_client_manager = AWSClientManager()
-        lang_ops = LanguageOperations(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        lang_ops = LanguageOperations(mock_client_instance)
 
         # Test language code validation
         if hasattr(lang_ops, '_validate_language_code'):
@@ -450,13 +462,16 @@ class TestLanguageOperationsRealCode:
             with pytest.raises(ValidationError):
                 lang_ops._validate_language_code('invalid-lang-code-too-long')
 
-    def test_language_operations_utility_methods_real(self):
-        """Test real language operations utility methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_operations_utility_methods_real(self, mock_aws_client):
+        """Test language operations utility methods with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
 
-        aws_client_manager = AWSClientManager()
-        lang_ops = LanguageOperations(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        lang_ops = LanguageOperations(mock_client_instance)
 
         # Test supported formats
         formats = lang_ops.get_supported_formats()
@@ -471,13 +486,16 @@ class TestLanguageOperationsRealCode:
             name_en = lang_ops._get_language_display_name('en')
             assert name_en is None or isinstance(name_en, str)
 
-    def test_language_operations_error_handling_real(self):
-        """Test real language operations error handling."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_operations_error_handling_real(self, mock_aws_client):
+        """Test language operations error handling with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
 
-        aws_client_manager = AWSClientManager()
-        lang_ops = LanguageOperations(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        lang_ops = LanguageOperations(mock_client_instance)
 
         # Test graceful handling of invalid inputs
         # result variable was removed, so skip this test
@@ -487,13 +505,16 @@ class TestLanguageOperationsRealCode:
             lang_ops._clear_cache()
             assert lang_ops._cache_timestamp is None
 
-    def test_language_operations_private_methods_real(self):
-        """Test real language operations private methods."""
-        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+    @patch('awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager')
+    def test_language_operations_private_methods_real(self, mock_aws_client):
+        """Test language operations private methods with mocked AWS client."""
         from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
 
-        aws_client_manager = AWSClientManager()
-        lang_ops = LanguageOperations(aws_client_manager)
+        # Mock AWS client manager
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        lang_ops = LanguageOperations(mock_client_instance)
 
         # Test private helper methods if they exist
         if hasattr(lang_ops, '_format_language_response'):

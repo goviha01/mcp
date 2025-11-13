@@ -36,7 +36,6 @@ from .exceptions import (
 from .language_operations import LanguageOperations
 from .logging_config import setup_logging
 from .models import TranslationJobSummary
-
 from .terminology_manager import TerminologyManager
 from .translation_service import TranslationService
 from .workflow_orchestrator import WorkflowOrchestrator
@@ -1277,7 +1276,6 @@ def health_check() -> Dict[str, Any]:
             'batch_manager': batch_manager,
             'terminology_manager': terminology_manager,
             'language_operations': language_operations,
-
             'workflow_orchestrator': workflow_orchestrator,
         }
 

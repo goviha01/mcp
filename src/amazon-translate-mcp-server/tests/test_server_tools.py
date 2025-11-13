@@ -34,7 +34,6 @@ class TestServerToolsExecution:
         """Set up mock services for all tests."""
         with (
             patch.object(server, 'translation_service') as mock_trans,
-
             patch.object(server, 'batch_manager') as mock_batch,
             patch.object(server, 'terminology_manager') as mock_term,
             patch.object(server, 'language_operations') as mock_lang,
@@ -42,7 +41,6 @@ class TestServerToolsExecution:
         ):
             self.mock_services = {
                 'translation': mock_trans,
-
                 'batch': mock_batch,
                 'terminology': mock_term,
                 'language': mock_lang,
@@ -742,7 +740,6 @@ class TestHealthCheckAndUtilities:
             patch.object(server, 'batch_manager'),
             patch.object(server, 'terminology_manager'),
             patch.object(server, 'language_operations'),
-
             patch.object(server, 'workflow_orchestrator'),
         ):
             # Mock successful credential validation

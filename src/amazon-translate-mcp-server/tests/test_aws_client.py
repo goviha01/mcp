@@ -550,7 +550,7 @@ class TestAWSClientManagerEdgeCases:
         manager = AWSClientManager()
 
         with pytest.raises(Exception):
-            manager.get_translate_client('invalid-service')
+            manager.get_translate_client()
 
     @patch('boto3.Session')
     def test_session_region_handling(self, mock_session):

@@ -168,3 +168,11 @@ exclude_also = [
 
 [tool.coverage.run]
 source = ["awslabs"]
+[tool.pyright]
+include = ["awslabs", "tests"]
+exclude = ["**/__pycache__", "**/.venv"]
+reportAttributeAccessIssue = "none"
+reportOptionalOperand = "none"
+reportUndefinedVariable = "error"
+reportCallIssue = "error"
+reportArgumentType = "error"

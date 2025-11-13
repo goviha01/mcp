@@ -28,7 +28,6 @@ class TestServerInitialization:
         with (
             patch('awslabs.amazon_translate_mcp_server.server.AWSClientManager') as mock_aws,
             patch('awslabs.amazon_translate_mcp_server.server.TranslationService') as mock_trans,
-
             patch('awslabs.amazon_translate_mcp_server.server.BatchJobManager') as mock_batch,
             patch('awslabs.amazon_translate_mcp_server.server.TerminologyManager') as mock_term,
             patch('awslabs.amazon_translate_mcp_server.server.LanguageOperations') as mock_lang,

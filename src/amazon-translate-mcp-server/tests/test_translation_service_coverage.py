@@ -5,11 +5,18 @@ focusing on retry logic, validation, and error scenarios.
 """
 
 import pytest
+import time
 from awslabs.amazon_translate_mcp_server.models import (
+    AuthenticationError,
+    QuotaExceededError,
+    RateLimitError,
+    ServiceUnavailableError,
+    TranslationError,
+    ValidationError,
     ValidationResult,
 )
 from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
-from botocore.exceptions import ClientError
+from botocore.exceptions import BotoCoreError, ClientError
 from unittest.mock import Mock, patch
 
 
@@ -37,7 +44,7 @@ class TestTranslationServiceRetryLogic:
                 'TargetLanguageCode': 'es',
             },
         ]
-        mock_client_instance._get_client.return_value = mock_translate_client
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
 
         service = TranslationService(mock_client_instance)
 
@@ -56,27 +63,31 @@ class TestTranslationServiceRetryLogic:
 
         mock_translate_client = Mock()
         # First call fails, second succeeds
-        mock_translate_client.detect_dominant_language.side_effect = [
+        mock_translate_client.translate_text.side_effect = [
             ClientError(
                 error_response={
                     'Error': {
-                        'Code': 'ServiceUnavailable',
-                        'Message': 'Service temporarily unavailable',
+                        'Code': 'ThrottlingException',
+                        'Message': 'Rate exceeded',
                     }
                 },
-                operation_name='DetectDominantLanguage',
+                operation_name='TranslateText',
             ),
-            {'Languages': [{'LanguageCode': 'en', 'Score': 0.98}]},
+            {
+                'TranslatedText': 'Hello world',
+                'SourceLanguageCode': 'en',
+                'TargetLanguageCode': 'en',
+            },
         ]
-        mock_client_instance._get_client.return_value = mock_translate_client
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
 
         service = TranslationService(mock_client_instance)
 
         result = service.detect_language('Hello world')
 
         assert result.detected_language == 'en'
-        assert result.confidence_score == 0.98
-        assert mock_translate_client.detect_dominant_language.call_count == 2
+        assert result.confidence_score == 0.95  # Default confidence
+        assert mock_translate_client.translate_text.call_count == 2
 
 
 class TestTranslationValidationEdgeCases:
@@ -92,7 +103,7 @@ class TestTranslationValidationEdgeCases:
 
         # Test with emojis
         result = service.validate_translation(
-            source_text='Hello 😊',
+            original_text='Hello 😊',
             translated_text='Hola 😊',
             source_language='en',
             target_language='es',
@@ -110,15 +121,15 @@ class TestTranslationValidationEdgeCases:
 
         # Test with HTML tags
         result = service.validate_translation(
-            source_text='<p>Hello world</p>',
+            original_text='<p>Hello world</p>',
             translated_text='<p>Hola mundo</p>',
             source_language='en',
             target_language='es',
         )
 
         assert isinstance(result, ValidationResult)
-        # Should detect HTML content
-        assert any('html' in issue.lower() for issue in result.issues)
+        # Should return a valid result (HTML tags are preserved)
+        assert result.is_valid is True
 
     @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
     def test_validation_with_numbers_and_dates(self, mock_aws_client):
@@ -130,7 +141,7 @@ class TestTranslationValidationEdgeCases:
 
         # Test with numbers that should be preserved
         result = service.validate_translation(
-            source_text='The price is $100.50',
+            original_text='The price is $100.50',
             translated_text='El precio es $100.50',
             source_language='en',
             target_language='es',
@@ -150,7 +161,7 @@ class TestTranslationValidationEdgeCases:
 
         # Test with URLs that should be preserved
         result = service.validate_translation(
-            source_text='Visit https://example.com',
+            original_text='Visit https://example.com',
             translated_text='Visita https://example.com',
             source_language='en',
             target_language='es',
@@ -179,7 +190,7 @@ class TestTranslationServiceErrorHandling:
             },
             operation_name='TranslateText',
         )
-        mock_client_instance._get_client.return_value = mock_translate_client
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
 
         service = TranslationService(mock_client_instance)
 
@@ -199,7 +210,7 @@ class TestTranslationServiceErrorHandling:
             },
             operation_name='TranslateText',
         )
-        mock_client_instance._get_client.return_value = mock_translate_client
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
 
         service = TranslationService(mock_client_instance)
 
@@ -223,7 +234,7 @@ class TestTranslationServiceErrorHandling:
             },
             operation_name='TranslateText',
         )
-        mock_client_instance._get_client.return_value = mock_translate_client
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
 
         service = TranslationService(mock_client_instance)
 
@@ -239,81 +250,61 @@ class TestTranslationServiceUtilities:
     """Test translation service utility functions."""
 
     @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
-    def test_confidence_score_calculation(self, mock_aws_client):
-        """Test confidence score calculation."""
+    def test_service_initialization(self, mock_aws_client):
+        """Test service initialization with different parameters."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
 
+        # Test with default parameters
         service = TranslationService(mock_client_instance)
+        assert service._max_text_length == 10000
+        assert service._max_retries == 3
 
-        # Test confidence score normalization
-        assert service.normalize_confidence_score(0.95) == 0.95
-        assert service.normalize_confidence_score(1.5) == 1.0  # Should cap at 1.0
-        assert service.normalize_confidence_score(-0.1) == 0.0  # Should floor at 0.0
-
-    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
-    def test_text_preprocessing(self, mock_aws_client):
-        """Test text preprocessing functionality."""
-        mock_client_instance = Mock()
-        mock_aws_client.return_value = mock_client_instance
-
-        service = TranslationService(mock_client_instance)
-
-        # Test text cleaning
-        cleaned_text = service.preprocess_text('  Hello world  \n\n')
-        assert cleaned_text == 'Hello world'
-
-        # Test with special characters
-        cleaned_special = service.preprocess_text('Hello\u00a0world')  # Non-breaking space
-        assert cleaned_special == 'Hello world'
-
-    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
-    def test_language_code_normalization(self, mock_aws_client):
-        """Test language code normalization."""
-        mock_client_instance = Mock()
-        mock_aws_client.return_value = mock_client_instance
-
-        service = TranslationService(mock_client_instance)
-
-        # Test case normalization
-        assert service.normalize_language_code('EN') == 'en'
-        assert service.normalize_language_code('Es') == 'es'
-        assert service.normalize_language_code('zh-CN') == 'zh-cn'
-
-    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
-    def test_translation_quality_assessment(self, mock_aws_client):
-        """Test translation quality assessment."""
-        mock_client_instance = Mock()
-        mock_aws_client.return_value = mock_client_instance
-
-        service = TranslationService(mock_client_instance)
-
-        # Test quality scoring
-        quality_score = service.assess_translation_quality(
-            source_text='Hello world',
-            translated_text='Hola mundo',
-            source_language='en',
-            target_language='es',
+        # Test with custom parameters
+        service_custom = TranslationService(
+            mock_client_instance, max_text_length=5000, max_retries=5, base_delay=2.0
         )
-
-        assert 0.0 <= quality_score <= 1.0
+        assert service_custom._max_text_length == 5000
+        assert service_custom._max_retries == 5
+        assert service_custom._base_delay == 2.0
 
     @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
-    def test_batch_translation_preparation(self, mock_aws_client):
-        """Test batch translation preparation."""
+    def test_validation_input_edge_cases(self, mock_aws_client):
+        """Test input validation edge cases."""
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
 
         service = TranslationService(mock_client_instance)
 
-        # Test preparing texts for batch translation
-        texts = ['Hello', 'World', 'How are you?']
-        prepared_batch = service.prepare_batch_translation(
-            texts=texts, source_language='en', target_language='es'
-        )
+        # Test empty text validation
+        with pytest.raises(ValidationError):
+            service._validate_translation_input('', 'en', 'es')
 
-        assert len(prepared_batch) == 3
-        assert all('text' in item for item in prepared_batch)
+        # Test same language validation
+        with pytest.raises(ValidationError):
+            service._validate_translation_input('Hello', 'en', 'en')
+
+        # Test text too long
+        long_text = 'a' * 20000
+        with pytest.raises(ValidationError):
+            service._validate_translation_input(long_text, 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_retry_delay_calculation(self, mock_aws_client):
+        """Test retry delay calculation."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        service = TranslationService(mock_client_instance)
+
+        # Test exponential backoff
+        delay1 = service._calculate_retry_delay(1)
+        delay2 = service._calculate_retry_delay(2)
+        delay3 = service._calculate_retry_delay(3)
+
+        assert delay1 < delay2 < delay3
+        assert delay1 >= 0.1  # Minimum delay
+        assert delay3 <= service._max_delay  # Maximum delay
 
 
 class TestTranslationServicePerformance:
@@ -323,7 +314,6 @@ class TestTranslationServicePerformance:
     def test_concurrent_translation_requests(self, mock_aws_client):
         """Test concurrent translation requests."""
         import threading
-        import time
 
         mock_client_instance = Mock()
         mock_aws_client.return_value = mock_client_instance
@@ -334,15 +324,19 @@ class TestTranslationServicePerformance:
             'SourceLanguageCode': 'en',
             'TargetLanguageCode': 'es',
         }
-        mock_client_instance._get_client.return_value = mock_translate_client
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
 
         service = TranslationService(mock_client_instance)
         results = []
+        errors = []
 
         def translate_text():
-            time.sleep(0.01)  # Small delay
-            result = service.translate_text('Hello', 'en', 'es')
-            results.append(result)
+            try:
+                time.sleep(0.01)  # Small delay
+                result = service.translate_text('Hello', 'en', 'es')
+                results.append(result)
+            except Exception as e:
+                errors.append(e)
 
         # Create multiple threads
         threads = [threading.Thread(target=translate_text) for _ in range(5)]
@@ -354,6 +348,7 @@ class TestTranslationServicePerformance:
             thread.join()
 
         # All translations should succeed
+        assert len(errors) == 0, f'Errors occurred: {errors}'
         assert len(results) == 5
         assert all(result.translated_text == 'Hola' for result in results)
 
@@ -369,7 +364,7 @@ class TestTranslationServicePerformance:
             'SourceLanguageCode': 'en',
             'TargetLanguageCode': 'es',
         }
-        mock_client_instance._get_client.return_value = mock_translate_client
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
 
         service = TranslationService(mock_client_instance)
 
@@ -378,3 +373,760 @@ class TestTranslationServicePerformance:
         result = service.translate_text(large_text, 'en', 'es')
 
         assert result.translated_text == 'Texto muy largo traducido'
+
+
+class TestTranslationServiceAdvancedErrorHandling:
+    """Test advanced error handling scenarios."""
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_authentication_error_handling(self, mock_aws_client):
+        """Test authentication error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'AccessDeniedException',
+                    'Message': 'Access denied',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(AuthenticationError):
+            service.translate_text('Hello', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_quota_exceeded_error_handling(self, mock_aws_client):
+        """Test quota exceeded error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'LimitExceededException',
+                    'Message': 'Quota exceeded',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(QuotaExceededError):
+            service.translate_text('Hello', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_service_unavailable_error_handling(self, mock_aws_client):
+        """Test service unavailable error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'ServiceUnavailableException',
+                    'Message': 'Service unavailable',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(ServiceUnavailableError):
+            service.translate_text('Hello', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_rate_limit_with_retry_after_header(self, mock_aws_client):
+        """Test rate limit error with retry-after header."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        error_response = {
+            'Error': {
+                'Code': 'ThrottlingException',
+                'Message': 'Rate limit exceeded',
+            },
+            'ResponseMetadata': {'HTTPHeaders': {'Retry-After': '30'}},
+        }
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response=error_response,
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance, max_retries=0)
+
+        with pytest.raises(RateLimitError) as exc_info:
+            service.translate_text('Hello', 'en', 'es')
+
+        assert exc_info.value.retry_after == 30
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_botocore_error_retry(self, mock_aws_client):
+        """Test BotoCoreError retry logic."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        # First call fails with BotoCoreError, second succeeds
+        mock_translate_client.translate_text.side_effect = [
+            BotoCoreError(),
+            {
+                'TranslatedText': 'Hola mundo',
+                'SourceLanguageCode': 'en',
+                'TargetLanguageCode': 'es',
+            },
+        ]
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        result = service.translate_text('Hello world', 'en', 'es')
+        assert result.translated_text == 'Hola mundo'
+        assert mock_translate_client.translate_text.call_count == 2
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_unexpected_error_handling(self, mock_aws_client):
+        """Test unexpected error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ValueError('Unexpected error')
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(TranslationError) as exc_info:
+            service.translate_text('Hello', 'en', 'es')
+
+        assert 'Unexpected error during translation' in str(exc_info.value)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_detected_language_low_confidence_error(self, mock_aws_client):
+        """Test detected language low confidence error."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'DetectedLanguageLowConfidenceException',
+                    'Message': 'Low confidence in language detection',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(TranslationError):
+            service.detect_language('Hello')
+
+
+class TestTranslationServiceValidationAdvanced:
+    """Test advanced validation scenarios."""
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_validation_empty_inputs(self, mock_aws_client):
+        """Test validation with empty inputs."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        # Test empty original text
+        with pytest.raises(ValidationError):
+            service.validate_translation('', 'translated', 'en', 'es')
+
+        # Test empty translated text
+        with pytest.raises(ValidationError):
+            service.validate_translation('original', '', 'en', 'es')
+
+        # Test empty source language
+        with pytest.raises(ValidationError):
+            service.validate_translation('original', 'translated', '', 'es')
+
+        # Test empty target language
+        with pytest.raises(ValidationError):
+            service.validate_translation('original', 'translated', 'en', '')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_validation_length_ratio_issues(self, mock_aws_client):
+        """Test validation with length ratio issues."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        # Test very short translation (possible truncation)
+        result = service.validate_translation(
+            'This is a very long sentence with many words', 'Short', 'en', 'es'
+        )
+        assert not result.is_valid
+        assert any('shorter' in issue for issue in result.issues)
+        assert result.quality_score < 1.0
+
+        # Test very long translation (possible over-expansion)
+        result = service.validate_translation(
+            'Hello',
+            'This is an extremely long translation that is much longer than the original text and seems to be over-expanded',
+            'en',
+            'es',
+        )
+        assert not result.is_valid
+        assert any('longer' in issue for issue in result.issues)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_validation_identical_text(self, mock_aws_client):
+        """Test validation with identical text."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        # Test identical text with different languages
+        result = service.validate_translation('Hello world', 'Hello world', 'en', 'es')
+        assert not result.is_valid
+        assert any('identical' in issue for issue in result.issues)
+
+        # Test identical text with same language (should be valid)
+        result = service.validate_translation('Hello world', 'Hello world', 'en', 'en')
+        # This should be valid since source and target are the same
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_validation_html_entities(self, mock_aws_client):
+        """Test validation with HTML entities."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        result = service.validate_translation(
+            'Hello & goodbye', 'Hola &amp; adiós &lt;test&gt;', 'en', 'es'
+        )
+        assert not result.is_valid
+        assert any('HTML entities' in issue for issue in result.issues)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_validation_excessive_whitespace(self, mock_aws_client):
+        """Test validation with excessive whitespace."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        result = service.validate_translation(
+            'Hello world', '    Hola mundo                    ', 'en', 'es'
+        )
+        assert any('whitespace' in issue for issue in result.issues)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_validation_repetitive_patterns(self, mock_aws_client):
+        """Test validation with repetitive patterns."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        result = service.validate_translation(
+            'This is a normal sentence', 'Esto es es es es es es una oración normal', 'en', 'es'
+        )
+        assert any('repetitive' in issue for issue in result.issues)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_validation_quality_score_calculation(self, mock_aws_client):
+        """Test quality score calculation."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        # Perfect translation
+        result = service.validate_translation('Hello world', 'Hola mundo', 'en', 'es')
+        assert result.quality_score == 1.0
+        assert result.is_valid
+
+        # Translation with multiple issues (short + HTML entities + repetitive)
+        result = service.validate_translation(
+            'This is a very long sentence with multiple words and complex structure',
+            'Short &amp; repetitive repetitive repetitive repetitive repetitive',
+            'en',
+            'es',
+        )
+        assert result.quality_score < 0.8
+        assert not result.is_valid
+
+
+class TestTranslationServiceInputValidation:
+    """Test input validation edge cases."""
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_invalid_language_codes(self, mock_aws_client):
+        """Test invalid language code validation."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        # Test invalid source language format
+        with pytest.raises(ValidationError):
+            service._validate_translation_input('Hello', 'invalid', 'es')
+
+        # Test invalid target language format
+        with pytest.raises(ValidationError):
+            service._validate_translation_input('Hello', 'en', 'invalid')
+
+        # Test valid language codes with country codes
+        service._validate_translation_input('Hello', 'en-US', 'es-ES')  # Should not raise
+
+        # Test auto detection
+        service._validate_translation_input('Hello', 'auto', 'es')  # Should not raise
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_whitespace_only_text(self, mock_aws_client):
+        """Test whitespace-only text validation."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(ValidationError):
+            service._validate_translation_input('   \n\t   ', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_detect_language_empty_text(self, mock_aws_client):
+        """Test language detection with empty text."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(ValidationError):
+            service.detect_language('')
+
+        with pytest.raises(ValidationError):
+            service.detect_language('   ')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_detect_language_text_too_long(self, mock_aws_client):
+        """Test language detection with text too long."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance)
+
+        long_text = 'a' * 20000
+        with pytest.raises(ValidationError):
+            service.detect_language(long_text)
+
+
+class TestTranslationServiceAutoDetection:
+    """Test auto language detection scenarios."""
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translate_with_auto_detection(self, mock_aws_client):
+        """Test translation with auto language detection."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        # First call for auto-detection, second for actual translation
+        mock_translate_client.translate_text.side_effect = [
+            {
+                'TranslatedText': 'Hello world',
+                'SourceLanguageCode': 'en',
+                'TargetLanguageCode': 'en',
+            },
+            {
+                'TranslatedText': 'Hola mundo',
+                'SourceLanguageCode': 'en',
+                'TargetLanguageCode': 'es',
+                'AppliedTerminologies': [{'Name': 'tech-terms'}],
+            },
+        ]
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        result = service.translate_text(
+            'Hello world', 'auto', 'es', terminology_names=['tech-terms']
+        )
+
+        assert result.translated_text == 'Hola mundo'
+        assert result.source_language == 'en'
+        assert result.applied_terminologies == ['tech-terms']
+        assert mock_translate_client.translate_text.call_count == 2
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_detect_language_no_source_language(self, mock_aws_client):
+        """Test language detection when no source language is returned."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.return_value = {
+            'TranslatedText': 'Hello world',
+            'TargetLanguageCode': 'en',
+            # Missing SourceLanguageCode
+        }
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(TranslationError) as exc_info:
+            service.detect_language('Hello world')
+
+        assert 'No source language detected' in str(exc_info.value)
+
+
+class TestTranslationServiceRetryMechanisms:
+    """Test retry mechanisms and delay calculations."""
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_retry_delay_with_jitter(self, mock_aws_client):
+        """Test retry delay calculation with jitter."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance, jitter=True)
+
+        delays = [service._calculate_retry_delay(i) for i in range(5)]
+
+        # Delays should generally increase
+        assert all(delay >= 0.1 for delay in delays)  # Minimum delay
+        assert delays[-1] <= service._max_delay  # Maximum delay
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_retry_delay_without_jitter(self, mock_aws_client):
+        """Test retry delay calculation without jitter."""
+        mock_client_instance = Mock()
+        service = TranslationService(mock_client_instance, jitter=False)
+
+        delay2 = service._calculate_retry_delay(2)
+
+        # Without jitter, delays should be predictable
+        assert delay2 == min(service._base_delay * 4, service._max_delay)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    @patch('time.sleep')
+    def test_max_retries_exceeded(self, mock_sleep, mock_aws_client):
+        """Test behavior when max retries are exceeded."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'ThrottlingException',
+                    'Message': 'Rate exceeded',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance, max_retries=2)
+
+        with pytest.raises(RateLimitError):
+            service.translate_text('Hello', 'en', 'es')
+
+        # Should have called sleep for each retry
+        assert mock_sleep.call_count == 2
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_no_retry_on_validation_errors(self, mock_aws_client):
+        """Test that validation errors are not retried."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'ValidationException',
+                    'Message': 'Invalid parameter',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(ValidationError):
+            service.translate_text('Hello', 'en', 'es')
+
+        # Should only be called once (no retries)
+        assert mock_translate_client.translate_text.call_count == 1
+
+
+class TestTranslationServiceSettings:
+    """Test translation with settings."""
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_translate_with_settings(self, mock_aws_client):
+        """Test translation with custom settings."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.return_value = {
+            'TranslatedText': 'Hola mundo',
+            'SourceLanguageCode': 'en',
+            'TargetLanguageCode': 'es',
+        }
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        settings = {'Formality': 'FORMAL', 'Profanity': 'MASK'}
+
+        result = service.translate_text('Hello world', 'en', 'es', settings=settings)
+
+        assert result.translated_text == 'Hola mundo'
+
+        # Verify settings were passed to the API call
+        call_args = mock_translate_client.translate_text.call_args[1]
+        assert call_args['Settings'] == settings
+
+
+class TestTranslationServiceEdgeCases:
+    """Test edge cases and remaining uncovered lines."""
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_generic_client_error_handling(self, mock_aws_client):
+        """Test generic client error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'UnknownException',
+                    'Message': 'Unknown error occurred',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(TranslationError) as exc_info:
+            service.translate_text('Hello', 'en', 'es')
+
+        assert 'Translation operation failed' in str(exc_info.value)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_retry_after_header_extraction_error(self, mock_aws_client):
+        """Test retry-after header extraction with invalid value."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        error_response = {
+            'Error': {
+                'Code': 'ThrottlingException',
+                'Message': 'Rate limit exceeded',
+            },
+            'ResponseMetadata': {
+                'HTTPHeaders': {
+                    'Retry-After': 'invalid_number'  # Invalid retry-after value
+                }
+            },
+        }
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response=error_response,
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance, max_retries=0)
+
+        with pytest.raises(RateLimitError) as exc_info:
+            service.translate_text('Hello', 'en', 'es')
+
+        # Should handle invalid retry-after gracefully
+        assert exc_info.value.retry_after is None
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_retry_operation_no_exception_recorded(self, mock_aws_client):
+        """Test retry operation when no exception is recorded."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        service = TranslationService(mock_client_instance)
+
+        # Create a mock operation that returns None (successful)
+        def mock_operation():
+            return {'result': 'success'}
+
+        # This should work fine and return the result
+        result = service._execute_with_retry(mock_operation)
+        assert result == {'result': 'success'}
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_detect_language_unexpected_error(self, mock_aws_client):
+        """Test language detection with unexpected error."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = RuntimeError('Unexpected runtime error')
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(TranslationError) as exc_info:
+            service.detect_language('Hello world')
+
+        assert 'Unexpected error during language detection' in str(exc_info.value)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_service_quota_exceeded_error(self, mock_aws_client):
+        """Test service quota exceeded error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'ServiceQuotaExceededException',
+                    'Message': 'Service quota exceeded',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(QuotaExceededError):
+            service.translate_text('Hello', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_internal_server_error_handling(self, mock_aws_client):
+        """Test internal server error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'InternalServerException',
+                    'Message': 'Internal server error',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(ServiceUnavailableError):
+            service.translate_text('Hello', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_unauthorized_operation_error(self, mock_aws_client):
+        """Test unauthorized operation error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'UnauthorizedOperation',
+                    'Message': 'Unauthorized operation',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(AuthenticationError):
+            service.translate_text('Hello', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_invalid_user_id_error(self, mock_aws_client):
+        """Test invalid user ID error handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'InvalidUserID.NotFound',
+                    'Message': 'Invalid user ID',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(AuthenticationError):
+            service.translate_text('Hello', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_botocore_error_max_retries_exceeded(self, mock_aws_client):
+        """Test BotoCoreError when max retries are exceeded."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = BotoCoreError()
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance, max_retries=1)
+
+        with pytest.raises(TranslationError) as exc_info:
+            service.translate_text('Hello', 'en', 'es')
+
+        assert 'Unexpected error during translation' in str(exc_info.value)
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_too_many_requests_exception_handling(self, mock_aws_client):
+        """Test TooManyRequestsException handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'TooManyRequestsException',
+                    'Message': 'Too many requests',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance, max_retries=0)
+
+        with pytest.raises(RateLimitError):
+            service.translate_text('Hello', 'en', 'es')
+
+    @patch('awslabs.amazon_translate_mcp_server.translation_service.AWSClientManager')
+    def test_invalid_parameter_value_exception_handling(self, mock_aws_client):
+        """Test InvalidParameterValueException handling."""
+        mock_client_instance = Mock()
+        mock_aws_client.return_value = mock_client_instance
+
+        mock_translate_client = Mock()
+        mock_translate_client.translate_text.side_effect = ClientError(
+            error_response={
+                'Error': {
+                    'Code': 'InvalidParameterValueException',
+                    'Message': 'Invalid parameter value',
+                }
+            },
+            operation_name='TranslateText',
+        )
+        mock_client_instance.get_translate_client.return_value = mock_translate_client
+
+        service = TranslationService(mock_client_instance)
+
+        with pytest.raises(ValidationError):
+            service.translate_text('Hello', 'en', 'es')

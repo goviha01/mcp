@@ -34,7 +34,7 @@ class TestServerToolsExecution:
         """Set up mock services for all tests."""
         with (
             patch.object(server, 'translation_service') as mock_trans,
-            patch.object(server, 'secure_translation_service') as mock_secure,
+
             patch.object(server, 'batch_manager') as mock_batch,
             patch.object(server, 'terminology_manager') as mock_term,
             patch.object(server, 'language_operations') as mock_lang,
@@ -42,7 +42,7 @@ class TestServerToolsExecution:
         ):
             self.mock_services = {
                 'translation': mock_trans,
-                'secure': mock_secure,
+
                 'batch': mock_batch,
                 'terminology': mock_term,
                 'language': mock_lang,
@@ -61,7 +61,7 @@ class TestServerToolsExecution:
             applied_terminologies=['tech-terms'],
             confidence_score=0.95,
         )
-        self.mock_services['secure'].translate_text.return_value = mock_result
+        self.mock_services['translation'].translate_text.return_value = mock_result
 
         # Create parameters
         params = server.TranslateTextParams(
@@ -113,7 +113,7 @@ class TestServerToolsExecution:
     @pytest.mark.asyncio
     async def test_translate_text_tool_exception_handling(self):
         """Test translate_text exception handling."""
-        self.mock_services['secure'].translate_text.side_effect = TranslationError(
+        self.mock_services['translation'].translate_text.side_effect = TranslationError(
             'Translation failed'
         )
 
@@ -742,7 +742,7 @@ class TestHealthCheckAndUtilities:
             patch.object(server, 'batch_manager'),
             patch.object(server, 'terminology_manager'),
             patch.object(server, 'language_operations'),
-            patch.object(server, 'secure_translation_service'),
+
             patch.object(server, 'workflow_orchestrator'),
         ):
             # Mock successful credential validation
@@ -756,7 +756,7 @@ class TestHealthCheckAndUtilities:
             assert result['components']['batch_manager'] == 'healthy'
             assert result['components']['terminology_manager'] == 'healthy'
             assert result['components']['language_operations'] == 'healthy'
-            assert result['components']['secure_translation_service'] == 'healthy'
+
             assert result['components']['workflow_orchestrator'] == 'healthy'
 
     def test_health_check_aws_client_unhealthy(self):
@@ -767,7 +767,7 @@ class TestHealthCheckAndUtilities:
             server.batch_manager = None
             server.terminology_manager = None
             server.language_operations = None
-            server.secure_translation_service = None
+
             server.workflow_orchestrator = None
 
             result = server.health_check()
@@ -787,7 +787,7 @@ class TestHealthCheckAndUtilities:
             server.batch_manager = None
             server.terminology_manager = Mock()
             server.language_operations = None
-            server.secure_translation_service = Mock()
+
             server.workflow_orchestrator = Mock()
 
             result = server.health_check()

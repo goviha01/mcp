@@ -20,9 +20,7 @@ class TestServerInitialization:
             patch('awslabs.amazon_translate_mcp_server.server.BatchJobManager') as mock_batch,
             patch('awslabs.amazon_translate_mcp_server.server.TerminologyManager') as mock_term,
             patch('awslabs.amazon_translate_mcp_server.server.LanguageOperations') as mock_lang,
-            patch(
-                'awslabs.amazon_translate_mcp_server.server.SecureTranslationService'
-            ) as mock_secure,
+
             patch(
                 'awslabs.amazon_translate_mcp_server.server.WorkflowOrchestrator'
             ) as mock_workflow,
@@ -35,7 +33,7 @@ class TestServerInitialization:
             mock_batch.assert_called_once()
             mock_term.assert_called_once()
             mock_lang.assert_called_once()
-            mock_secure.assert_called_once()
+
             mock_workflow.assert_called_once()
 
             # Verify global variables are set
@@ -44,7 +42,7 @@ class TestServerInitialization:
             assert server.batch_manager is not None
             assert server.terminology_manager is not None
             assert server.language_operations is not None
-            assert server.secure_translation_service is not None
+
             assert server.workflow_orchestrator is not None
 
     def test_initialize_services_failure(self):
@@ -259,7 +257,7 @@ class TestHealthCheck:
             patch.object(server, 'batch_manager'),
             patch.object(server, 'terminology_manager'),
             patch.object(server, 'language_operations'),
-            patch.object(server, 'secure_translation_service'),
+
             patch.object(server, 'workflow_orchestrator'),
         ):
             # Mock successful credential validation

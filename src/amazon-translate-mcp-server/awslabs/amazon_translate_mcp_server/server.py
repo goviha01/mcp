@@ -36,7 +36,7 @@ from .exceptions import (
 from .language_operations import LanguageOperations
 from .logging_config import setup_logging
 from .models import TranslationJobSummary
-from .secure_translation_service import SecureTranslationService
+
 from .terminology_manager import TerminologyManager
 from .translation_service import TranslationService
 from .workflow_orchestrator import WorkflowOrchestrator
@@ -226,7 +226,7 @@ class AnalyzeBatchTranslationErrorsParams(BaseModel):
 # Global service instances
 aws_client_manager: Optional[AWSClientManager] = None
 translation_service: Optional[TranslationService] = None
-secure_translation_service: Optional[SecureTranslationService] = None
+
 batch_manager: Optional[BatchJobManager] = None
 terminology_manager: Optional[TerminologyManager] = None
 language_operations: Optional[LanguageOperations] = None
@@ -235,7 +235,7 @@ workflow_orchestrator: Optional[WorkflowOrchestrator] = None
 
 def initialize_services() -> None:
     """Initialize all service components."""
-    global aws_client_manager, translation_service, secure_translation_service
+    global aws_client_manager, translation_service
     global batch_manager, terminology_manager, language_operations, workflow_orchestrator
 
     try:
@@ -246,7 +246,7 @@ def initialize_services() -> None:
 
         # Initialize core services
         translation_service = TranslationService(aws_client_manager)
-        secure_translation_service = SecureTranslationService(aws_client_manager)
+
         batch_manager = BatchJobManager(aws_client_manager)
         terminology_manager = TerminologyManager(aws_client_manager)
         language_operations = LanguageOperations(aws_client_manager)
@@ -1277,7 +1277,7 @@ def health_check() -> Dict[str, Any]:
             'batch_manager': batch_manager,
             'terminology_manager': terminology_manager,
             'language_operations': language_operations,
-            'secure_translation_service': secure_translation_service,
+
             'workflow_orchestrator': workflow_orchestrator,
         }
 

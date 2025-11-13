@@ -28,9 +28,7 @@ class TestServerInitialization:
         with (
             patch('awslabs.amazon_translate_mcp_server.server.AWSClientManager') as mock_aws,
             patch('awslabs.amazon_translate_mcp_server.server.TranslationService') as mock_trans,
-            patch(
-                'awslabs.amazon_translate_mcp_server.server.SecureTranslationService'
-            ) as mock_secure,
+
             patch('awslabs.amazon_translate_mcp_server.server.BatchJobManager') as mock_batch,
             patch('awslabs.amazon_translate_mcp_server.server.TerminologyManager') as mock_term,
             patch('awslabs.amazon_translate_mcp_server.server.LanguageOperations') as mock_lang,
@@ -44,7 +42,7 @@ class TestServerInitialization:
             # Verify all services were initialized
             mock_aws.assert_called_once()
             mock_trans.assert_called_once()
-            mock_secure.assert_called_once()
+
             mock_batch.assert_called_once()
             mock_term.assert_called_once()
             mock_lang.assert_called_once()
@@ -127,7 +125,7 @@ class TestServerGlobalVariables:
         # These should be defined as module-level variables
         assert hasattr(server, 'aws_client_manager')
         assert hasattr(server, 'translation_service')
-        assert hasattr(server, 'secure_translation_service')
+
         assert hasattr(server, 'batch_manager')
         assert hasattr(server, 'terminology_manager')
         assert hasattr(server, 'language_operations')

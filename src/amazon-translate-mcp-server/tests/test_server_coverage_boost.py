@@ -132,7 +132,7 @@ class TestServerParameterValidation:
         )
         assert params.job_name == 'test-job'
         assert params.terminology_names is None
-        assert params.parallel_data_names is None
+        assert params.content_type == 'text/plain'
 
     def test_workflow_params_edge_cases(self):
         """Test workflow parameters edge cases."""
@@ -140,8 +140,8 @@ class TestServerParameterValidation:
 
         # Test with default quality threshold
         params = SmartTranslateWorkflowParams(text='Hello world', target_language='es')
-        assert params.quality_threshold is None
-        assert params.source_language is None
+        assert params.quality_threshold == 0.8
+        assert params.auto_detect_language is True
 
 
 class TestServerHealthCheckScenarios:

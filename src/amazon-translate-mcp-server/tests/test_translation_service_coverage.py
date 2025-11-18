@@ -1308,3 +1308,264 @@ class TestTranslationServiceRealCode:
                 translation_service._validate_translation_quality('Hello', 'Hola', 0.8)
             except Exception:
                 pass  # Method might require additional setup
+
+
+class TestTranslationServiceRealCodeExecution:
+    """Tests that exercise real TranslationService code paths for better coverage."""
+
+    @patch('boto3.Session')
+    def test_translate_text_real_execution(self, mock_session):
+        """Test translate_text method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.translate_text.return_value = {
+            'TranslatedText': 'Hola mundo',
+            'SourceLanguageCode': 'en',
+            'TargetLanguageCode': 'es',
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        translation_service = TranslationService(aws_client_manager)
+
+        # Test translate_text - this exercises real business logic
+        result = translation_service.translate_text(
+            text='Hello world', source_language='en', target_language='es'
+        )
+
+        # Verify the call was made and result processed
+        mock_translate_client.translate_text.assert_called_once()
+        call_args = mock_translate_client.translate_text.call_args[1]
+        assert call_args['Text'] == 'Hello world'
+        assert call_args['SourceLanguageCode'] == 'en'
+        assert call_args['TargetLanguageCode'] == 'es'
+
+        assert hasattr(result, 'translated_text')
+        assert result.translated_text == 'Hola mundo'
+        assert result.source_language == 'en'
+        assert result.target_language == 'es'
+
+    @patch('boto3.Session')
+    def test_detect_language_real_execution(self, mock_session):
+        """Test detect_language method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response for auto-detection via translate_text
+        mock_translate_client.translate_text.return_value = {
+            'TranslatedText': 'Hello world',
+            'SourceLanguageCode': 'en',
+            'TargetLanguageCode': 'en',
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        translation_service = TranslationService(aws_client_manager)
+
+        # Test detect_language - this exercises real business logic
+        result = translation_service.detect_language('Hello world')
+
+        # Verify the call was made and result processed (uses translate_text with auto-detection)
+        mock_translate_client.translate_text.assert_called_once_with(
+            Text='Hello world', SourceLanguageCode='auto', TargetLanguageCode='en'
+        )
+
+        assert hasattr(result, 'detected_language')
+        assert result.detected_language == 'en'
+        assert result.confidence_score == 0.95  # Fixed confidence score used by the method
+
+    @patch('boto3.Session')
+    def test_validate_translation_real_execution(self, mock_session):
+        """Test validate_translation method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        translation_service = TranslationService(aws_client_manager)
+
+        # Test validate_translation - this exercises real validation logic
+        result = translation_service.validate_translation(
+            original_text='Hello world',
+            translated_text='Hola mundo',
+            source_language='en',
+            target_language='es',
+        )
+
+        assert hasattr(result, 'is_valid')
+        assert hasattr(result, 'quality_score')
+        assert hasattr(result, 'issues')
+        assert isinstance(result.is_valid, bool)
+        assert isinstance(result.quality_score, (int, float))
+        assert isinstance(result.issues, list)
+
+    @patch('boto3.Session')
+    def test_validation_methods_real_execution(self, mock_session):
+        """Test validation methods with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.models import ValidationError
+        from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        translation_service = TranslationService(aws_client_manager)
+
+        # Test translation input validation - exercises real validation logic
+        translation_service._validate_translation_input('Valid text', 'en', 'es')
+        translation_service._validate_translation_input('Text with numbers 123', 'en', 'fr')
+
+        # Test invalid text - these should raise ValidationError as expected
+        try:
+            translation_service._validate_translation_input('', 'en', 'es')
+            assert False, 'Should have raised ValidationError'
+        except ValidationError as e:
+            assert 'Text cannot be empty' in str(e)
+
+        try:
+            translation_service._validate_translation_input('   ', 'en', 'es')  # Whitespace only
+            assert False, 'Should have raised ValidationError'
+        except ValidationError as e:
+            assert 'Text cannot be empty' in str(e)
+
+        try:
+            translation_service._validate_translation_input('a' * 20000, 'en', 'es')  # Too long
+            assert False, 'Should have raised ValidationError'
+        except ValidationError as e:
+            assert 'exceeds maximum' in str(e)
+
+    @patch('boto3.Session')
+    def test_retry_logic_real_execution(self, mock_session):
+        """Test retry logic with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.translation_service import TranslationService
+        from botocore.exceptions import ClientError
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client to raise throttling error first, then succeed
+        mock_translate_client.translate_text.side_effect = [
+            ClientError(
+                error_response={
+                    'Error': {'Code': 'ThrottlingException', 'Message': 'Rate exceeded'}
+                },
+                operation_name='TranslateText',
+            ),
+            {
+                'TranslatedText': 'Hola mundo',
+                'SourceLanguageCode': 'en',
+                'TargetLanguageCode': 'es',
+            },
+        ]
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        translation_service = TranslationService(aws_client_manager)
+
+        # Test translate_text with retry - this exercises real retry logic
+        result = translation_service.translate_text(
+            text='Hello world', source_language='en', target_language='es'
+        )
+
+        # Verify retry happened and final result is correct
+        assert mock_translate_client.translate_text.call_count == 2
+        assert result.translated_text == 'Hola mundo'

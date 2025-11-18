@@ -573,16 +573,36 @@ class TestTerminologyRealCode:
 class TestTerminologyManagerAdvancedCoverage:
     """Advanced tests to improve terminology manager coverage."""
 
-    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
-    def test_terminology_manager_get_translate_client(self, mock_aws_client):
-        """Test getting translate client."""
+    @patch('boto3.Session')
+    def test_terminology_manager_get_translate_client(self, mock_session):
+        """Test getting translate client with real TerminologyManager but mocked boto3."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        # Mock AWS client manager
-        mock_client_instance = Mock()
-        mock_aws_client.return_value = mock_client_instance
+        # Mock boto3 session and client
+        mock_translate_client = Mock()
+        mock_session_instance = Mock()
+        mock_session_instance.client.return_value = mock_translate_client
+        mock_session.return_value = mock_session_instance
 
-        aws_client_manager = mock_client_instance
+        # Mock STS client for credential validation
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+
+        # Create real AWS client manager and terminology manager
+        aws_client_manager = AWSClientManager()
         terminology_manager = TerminologyManager(aws_client_manager)
 
         # Test getting translate client
@@ -593,19 +613,37 @@ class TestTerminologyManagerAdvancedCoverage:
         client2 = terminology_manager._get_translate_client()
         assert client is client2
 
-    @patch('awslabs.amazon_translate_mcp_server.terminology_manager.AWSClientManager')
-    def test_terminology_manager_validation_edge_cases(self, mock_aws_client):
-        """Test validation edge cases."""
+    @patch('boto3.Session')
+    def test_terminology_manager_validation_edge_cases(self, mock_session):
+        """Test validation edge cases with real TerminologyManager."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
         from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
 
-        # Mock AWS client manager
-        mock_client_instance = Mock()
-        mock_aws_client.return_value = mock_client_instance
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
 
-        aws_client_manager = mock_client_instance
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
         terminology_manager = TerminologyManager(aws_client_manager)
 
-        # Test valid terminology names
+        # Test valid terminology names - these should exercise real validation logic
         terminology_manager._validate_terminology_name('valid-name')
         terminology_manager._validate_terminology_name('ValidName123')
         terminology_manager._validate_terminology_name('test_terminology')
@@ -867,3 +905,301 @@ class TestTerminologyManagerAdvancedCoverage:
                 assert isinstance(conflicts, (list, dict, bool))
             except Exception:
                 pass  # May require specific setup
+
+
+class TestTerminologyManagerRealCodeExecution:
+    """Tests that exercise real TerminologyManager code paths for better coverage."""
+
+    @patch('boto3.Session')
+    def test_list_terminologies_real_execution(self, mock_session):
+        """Test list_terminologies method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.list_terminologies.return_value = {
+            'TerminologyPropertiesList': [
+                {
+                    'Name': 'test-terminology',
+                    'Description': 'Test terminology',
+                    'Arn': 'arn:aws:translate:us-east-1:123456789012:terminology/test-terminology',
+                    'SourceLanguageCode': 'en',
+                    'TargetLanguageCodes': ['es', 'fr'],
+                    'EncryptionKey': {'Type': 'KMS', 'Id': 'alias/aws/translate'},
+                    'SizeBytes': 1024,
+                    'TermCount': 10,
+                    'CreatedAt': '2023-01-01T00:00:00Z',
+                    'LastUpdatedAt': '2023-01-01T00:00:00Z',
+                }
+            ]
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        terminology_manager = TerminologyManager(aws_client_manager)
+
+        # Test list_terminologies - this exercises real business logic
+        result = terminology_manager.list_terminologies()
+
+        # Verify the call was made and result processed
+        mock_translate_client.list_terminologies.assert_called_once_with(MaxResults=50)
+        assert 'terminologies' in result
+        assert len(result['terminologies']) == 1
+        assert result['terminologies'][0].name == 'test-terminology'
+
+    @patch('boto3.Session')
+    def test_get_terminology_real_execution(self, mock_session):
+        """Test get_terminology method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.get_terminology.return_value = {
+            'TerminologyProperties': {
+                'Name': 'test-terminology',
+                'Description': 'Test terminology',
+                'Arn': 'arn:aws:translate:us-east-1:123456789012:terminology/test-terminology',
+                'SourceLanguageCode': 'en',
+                'TargetLanguageCodes': ['es', 'fr'],
+                'EncryptionKey': {'Type': 'KMS', 'Id': 'alias/aws/translate'},
+                'SizeBytes': 1024,
+                'TermCount': 10,
+                'CreatedAt': '2023-01-01T00:00:00Z',
+                'LastUpdatedAt': '2023-01-01T00:00:00Z',
+            },
+            'TerminologyDataLocation': {'RepositoryType': 'S3', 'Location': 's3://bucket/key'},
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        terminology_manager = TerminologyManager(aws_client_manager)
+
+        # Test get_terminology - this exercises real business logic
+        result = terminology_manager.get_terminology('test-terminology')
+
+        # Verify the call was made and result processed
+        mock_translate_client.get_terminology.assert_called_once_with(
+            Name='test-terminology', TerminologyDataFormat='CSV'
+        )
+        assert hasattr(result, 'name')
+        assert result.name == 'test-terminology'
+
+    @patch('boto3.Session')
+    def test_create_terminology_real_execution(self, mock_session):
+        """Test create_terminology method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.models import TerminologyData
+        from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.import_terminology.return_value = {
+            'TerminologyProperties': {
+                'Name': 'test-terminology',
+                'Description': 'Test terminology',
+                'Arn': 'arn:aws:translate:us-east-1:123456789012:terminology/test-terminology',
+                'SourceLanguageCode': 'en',
+                'TargetLanguageCodes': ['es'],
+                'EncryptionKey': {'Type': 'KMS', 'Id': 'alias/aws/translate'},
+                'SizeBytes': 1024,
+                'TermCount': 2,
+                'CreatedAt': '2023-01-01T00:00:00Z',
+                'LastUpdatedAt': '2023-01-01T00:00:00Z',
+            }
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        terminology_manager = TerminologyManager(aws_client_manager)
+
+        # Create terminology data
+        terminology_data = TerminologyData(
+            terminology_data=b'source,target\nhello,hola\nworld,mundo', format='CSV'
+        )
+
+        # Test create_terminology - this exercises real business logic including validation
+        result = terminology_manager.create_terminology(
+            name='test-terminology',
+            description='Test terminology',
+            terminology_data=terminology_data,
+        )
+
+        # Verify the call was made and result processed
+        mock_translate_client.import_terminology.assert_called_once()
+        call_args = mock_translate_client.import_terminology.call_args[1]
+        assert call_args['Name'] == 'test-terminology'
+        assert call_args['Description'] == 'Test terminology'
+
+        # The result should be a string (ARN)
+        assert isinstance(result, str)
+        assert 'test-terminology' in result
+
+    @patch('boto3.Session')
+    def test_delete_terminology_real_execution(self, mock_session):
+        """Test delete_terminology method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.delete_terminology.return_value = {}
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        terminology_manager = TerminologyManager(aws_client_manager)
+
+        # Test delete_terminology - this exercises real business logic including validation
+        result = terminology_manager.delete_terminology('test-terminology')
+
+        # Verify the call was made and result processed
+        mock_translate_client.delete_terminology.assert_called_once_with(Name='test-terminology')
+        assert result is True
+
+    @patch('boto3.Session')
+    def test_validation_methods_real_execution(self, mock_session):
+        """Test validation methods with real code execution."""
+        import pytest
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.models import TerminologyData, ValidationError
+        from awslabs.amazon_translate_mcp_server.terminology_manager import TerminologyManager
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        terminology_manager = TerminologyManager(aws_client_manager)
+
+        # Test name validation - exercises real validation logic
+        terminology_manager._validate_terminology_name('valid-name')
+        terminology_manager._validate_terminology_name('ValidName123')
+
+        # Test invalid names - this should raise ValidationError as expected
+        # Test that ValidationError is raised for empty name (this is expected behavior)
+        try:
+            terminology_manager._validate_terminology_name('')
+            assert False, 'Should have raised ValidationError'
+        except ValidationError as e:
+            assert 'Terminology name cannot be empty' in str(e)
+
+        # Test that ValidationError is raised for too long name
+        try:
+            terminology_manager._validate_terminology_name('a' * 300)  # Too long
+            assert False, 'Should have raised ValidationError'
+        except ValidationError as e:
+            assert 'cannot exceed 256 characters' in str(e)
+
+        # Test description validation
+        terminology_manager._validate_terminology_description('')
+        terminology_manager._validate_terminology_description('Valid description')
+
+        # Test language code validation
+        terminology_manager._validate_language_code('en', 'source_language')
+        terminology_manager._validate_language_code('es-ES', 'target_language')
+
+        with pytest.raises(ValidationError):
+            terminology_manager._validate_language_code('', 'source_language')
+
+        # Test terminology data validation
+        valid_csv = TerminologyData(terminology_data=b'source,target\nhello,hola', format='CSV')
+        terminology_manager._validate_terminology_data(valid_csv)
+
+        # Test invalid data - TerminologyData raises ValueError for empty data
+        with pytest.raises(ValueError):
+            invalid_data = TerminologyData(terminology_data=b'', format='CSV')
+            terminology_manager._validate_terminology_data(invalid_data)

@@ -528,3 +528,277 @@ class TestLanguageOperationsRealCode:
                 lang_ops._validate_language_pair('en', 'es')
             except Exception:
                 pass  # Method might require AWS client
+
+
+class TestLanguageOperationsRealCodeExecution:
+    """Tests that exercise real LanguageOperations code paths for better coverage."""
+
+    @patch('boto3.Session')
+    def test_get_supported_languages_real_execution(self, mock_session):
+        """Test get_supported_languages method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.list_languages.return_value = {
+            'Languages': [
+                {'LanguageCode': 'en', 'LanguageName': 'English'},
+                {'LanguageCode': 'es', 'LanguageName': 'Spanish'},
+                {'LanguageCode': 'fr', 'LanguageName': 'French'},
+            ]
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        language_ops = LanguageOperations(aws_client_manager)
+
+        # Test list_language_pairs - this exercises real business logic
+        result = language_ops.list_language_pairs()
+
+        # Verify the call was made and result processed
+        assert mock_translate_client.list_languages.call_count >= 1
+
+        # Result should be a list of LanguagePair objects
+        assert isinstance(result, list)
+        if result:  # If there are results
+            assert hasattr(result[0], 'source_language')
+            assert hasattr(result[0], 'target_language')
+
+    @patch('boto3.Session')
+    def test_validate_language_pair_real_execution(self, mock_session):
+        """Test validate_language_pair method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.list_languages.return_value = {
+            'Languages': [
+                {'LanguageCode': 'en', 'LanguageName': 'English'},
+                {'LanguageCode': 'es', 'LanguageName': 'Spanish'},
+                {'LanguageCode': 'fr', 'LanguageName': 'French'},
+            ]
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        language_ops = LanguageOperations(aws_client_manager)
+
+        # Test validate_language_pair - this exercises real validation logic
+        result = language_ops.validate_language_pair('en', 'es')
+
+        # Result should be a boolean
+        assert isinstance(result, bool)
+
+    @patch('boto3.Session')
+    def test_get_language_name_real_execution(self, mock_session):
+        """Test get_language_name method with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.list_languages.return_value = {
+            'Languages': [
+                {'LanguageCode': 'en', 'LanguageName': 'English'},
+                {'LanguageCode': 'es', 'LanguageName': 'Spanish'},
+                {'LanguageCode': 'fr', 'LanguageName': 'French'},
+            ]
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        language_ops = LanguageOperations(aws_client_manager)
+
+        # Test get_language_name - this exercises real lookup logic
+        result = language_ops.get_language_name('en')
+
+        # Result should be a string or None
+        assert result is None or isinstance(result, str)
+
+    @patch('boto3.Session')
+    def test_cache_functionality_real_execution(self, mock_session):
+        """Test cache functionality with real code execution."""
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+        from datetime import datetime, timedelta
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        # Mock translate client response
+        mock_translate_client.list_languages.return_value = {
+            'Languages': [
+                {'LanguageCode': 'en', 'LanguageName': 'English'},
+                {'LanguageCode': 'es', 'LanguageName': 'Spanish'},
+            ]
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        language_ops = LanguageOperations(aws_client_manager)
+
+        # Clear any existing cache state
+        language_ops._language_cache = None
+        language_ops._cache_timestamp = None
+
+        # Test cache validity checking - exercises real cache logic
+        assert not language_ops._is_cache_valid()  # Should be False initially
+
+        # Reset mock call count to ensure clean state
+        mock_translate_client.list_languages.reset_mock()
+
+        # First call should populate cache
+        result1 = language_ops.list_language_pairs()
+        first_call_count = mock_translate_client.list_languages.call_count
+        assert first_call_count >= 1  # At least one call should be made
+
+        # Second call should use cache
+        result2 = language_ops.list_language_pairs()
+        assert (
+            mock_translate_client.list_languages.call_count == first_call_count
+        )  # No additional call
+
+        # Results should be identical
+        assert result1 == result2
+
+        # Test cache expiration
+        language_ops._cache_timestamp = datetime.utcnow() - timedelta(hours=25)  # Expired
+        assert not language_ops._is_cache_valid()
+
+        # Next call should refresh cache
+        result3 = language_ops.list_language_pairs()
+        assert (
+            mock_translate_client.list_languages.call_count > first_call_count
+        )  # Additional call made
+
+        # Test that cache was refreshed and results are still valid
+        assert result3 is not None
+        assert len(result3) > 0
+
+    @patch('boto3.Session')
+    def test_validation_methods_real_execution(self, mock_session):
+        """Test validation methods with real code execution."""
+        import pytest
+        from awslabs.amazon_translate_mcp_server.aws_client import AWSClientManager
+        from awslabs.amazon_translate_mcp_server.exceptions import ValidationError
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        # Mock boto3 session and clients
+        mock_translate_client = Mock()
+        mock_sts_client = Mock()
+        mock_sts_client.get_caller_identity.return_value = {
+            'Account': '123456789012',
+            'Arn': 'arn:aws:iam::123456789012:user/test',
+        }
+
+        mock_session_instance = Mock()
+
+        def client_side_effect(service_name, **kwargs):
+            if service_name == 'sts':
+                return mock_sts_client
+            elif service_name == 'translate':
+                return mock_translate_client
+            return Mock()
+
+        mock_session_instance.client.side_effect = client_side_effect
+        mock_session.return_value = mock_session_instance
+
+        # Create real instances
+        aws_client_manager = AWSClientManager()
+        language_ops = LanguageOperations(aws_client_manager)
+
+        # Test language code validation if method exists
+        if hasattr(language_ops, '_validate_language_code'):
+            language_ops._validate_language_code('en')
+            language_ops._validate_language_code('es-ES')
+
+            with pytest.raises(ValidationError):
+                language_ops._validate_language_code('')
+
+            with pytest.raises(ValidationError):
+                language_ops._validate_language_code('invalid-lang-code-too-long')
+
+        # Test supported formats functionality
+        formats = language_ops.get_supported_formats()
+        assert isinstance(formats, list)
+        assert len(formats) > 0
+
+        # Test terminology support check
+        supports_terminology = language_ops.is_terminology_supported('en', 'es')
+        assert isinstance(supports_terminology, bool)

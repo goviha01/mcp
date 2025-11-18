@@ -207,7 +207,9 @@ class TestMCPToolFunctions:
             )
 
             # Call the MCP tool function via the underlying function
-            result = await server.translate_text.fn(params)
+            result = await server.translate_text.fn(  # type: ignore
+                params
+            )
 
             # Verify the service was called correctly
             mock_service.translate_text.assert_called_once_with(
@@ -229,7 +231,9 @@ class TestMCPToolFunctions:
                 text='Hello world', source_language='en', target_language='es'
             )
 
-            result = await server.translate_text.fn(params)
+            result = await server.translate_text.fn(  # type: ignore
+                params
+            )
 
             assert 'error' in result
             assert 'Translation service not initialized' in result['error']
@@ -245,7 +249,9 @@ class TestMCPToolFunctions:
                 text='Hello world', source_language='en', target_language='es'
             )
 
-            result = await server.translate_text.fn(params)
+            result = await server.translate_text.fn(  # type: ignore
+                params
+            )
 
             assert 'error' in result
             assert 'Translation failed' in result['error']
@@ -268,7 +274,9 @@ class TestMCPToolFunctions:
             params = server.DetectLanguageParams(text='Hello world')
 
             # Call the MCP tool function
-            result = await server.detect_language.fn(params)
+            result = await server.detect_language.fn(  # type: ignore
+                params
+            )
 
             # Verify the service was called correctly
             mock_service.detect_language.assert_called_once_with('Hello world')
@@ -284,7 +292,9 @@ class TestMCPToolFunctions:
         with patch.object(server, 'translation_service', None):
             params = server.DetectLanguageParams(text='Hello world')
 
-            result = await server.detect_language.fn(params)
+            result = await server.detect_language.fn(  # type: ignore
+                params
+            )
 
             assert 'error' in result
             assert 'Translation service not initialized' in result['error']
@@ -313,7 +323,9 @@ class TestMCPToolFunctions:
             )
 
             # Call the MCP tool function
-            result = await server.validate_translation.fn(params)
+            result = await server.validate_translation.fn(  # type: ignore
+                params
+            )
 
             # Verify the service was called correctly
             mock_service.validate_translation.assert_called_once_with(
@@ -350,7 +362,9 @@ class TestMCPToolErrorHandling:
                 terminology_names=None,
             )
 
-            result = await server.translate_text.fn(params)
+            result = await server.translate_text.fn(  # type: ignore
+                params
+            )
 
             # Verify the service was called with empty list when terminology_names is None
             mock_service.translate_text.assert_called_once_with(
@@ -370,7 +384,9 @@ class TestMCPToolErrorHandling:
 
             params = server.DetectLanguageParams(text='Hello world')
 
-            result = await server.detect_language.fn(params)
+            result = await server.detect_language.fn(  # type: ignore
+                params
+            )
 
             assert 'error' in result
             assert 'Unexpected error' in result['error']
@@ -403,7 +419,9 @@ class TestMCPToolIntegration:
                 text='Hello world', source_language='en', target_language='es'
             )
 
-            result = await server.translate_text.fn(params)
+            result = await server.translate_text.fn(  # type: ignore
+                params
+            )
 
             # Verify executor was used
             mock_get_loop.assert_called_once()
@@ -435,7 +453,9 @@ class TestMCPToolIntegration:
 
             params = server.DetectLanguageParams(text='Hello world')
 
-            result = await server.detect_language.fn(params)
+            result = await server.detect_language.fn(  # type: ignore
+                params
+            )
 
             # Verify executor was used
             mock_get_loop.assert_called_once()
@@ -468,7 +488,9 @@ class TestBatchTranslationMCPTools:
                 target_languages=['es', 'fr'],
             )
 
-            result = await server.start_batch_translation.fn(params)
+            result = await server.start_batch_translation.fn(  # type: ignore
+                params
+            )
 
             assert result['job_id'] == 'job-123'
             assert result['status'] == 'SUBMITTED'
@@ -494,7 +516,9 @@ class TestBatchTranslationMCPTools:
                 target_languages=['es'],
             )
 
-            result = await server.start_batch_translation.fn(params)
+            result = await server.start_batch_translation.fn(  # type: ignore
+                params
+            )
 
             assert 'error' in result
             assert 'Batch manager not initialized' in result['error']
@@ -516,7 +540,9 @@ class TestBatchTranslationMCPTools:
 
             params = server.GetTranslationJobParams(job_id='job-123')
 
-            result = await server.get_translation_job.fn(params)
+            result = await server.get_translation_job.fn(  # type: ignore
+                params
+            )
 
             assert result['job_id'] == 'job-123'
             assert result['job_name'] == 'test-job'
@@ -554,7 +580,9 @@ class TestBatchTranslationMCPTools:
 
             params = server.ListTranslationJobsParams(status_filter='ALL', max_results=50)
 
-            result = await server.list_translation_jobs.fn(params)
+            result = await server.list_translation_jobs.fn(  # type: ignore
+                params
+            )
 
             assert result['total_count'] == 2
             assert len(result['jobs']) == 2
@@ -588,7 +616,8 @@ class TestTerminologyMCPTools:
                 'next_token': None,
             }
 
-            result = await server.list_terminologies.fn()
+            result = await server.list_terminologies.fn(  # type: ignore
+            )
 
             assert result['total_count'] == 1
             assert len(result['terminologies']) == 1
@@ -617,7 +646,9 @@ class TestTerminologyMCPTools:
                 ],
             )
 
-            result = await server.create_terminology.fn(params)
+            result = await server.create_terminology.fn(  # type: ignore
+                params
+            )
 
             assert result['name'] == 'tech-terms'
             assert result['status'] == 'CREATED'
@@ -646,7 +677,9 @@ class TestTerminologyMCPTools:
 
             params = server.GetTerminologyParams(name='tech-terms')
 
-            result = await server.get_terminology.fn(params)
+            result = await server.get_terminology.fn(  # type: ignore
+                params
+            )
 
             assert result['name'] == 'tech-terms'
             assert result['description'] == 'Technical terminology'
@@ -689,7 +722,9 @@ class TestTerminologyMCPTools:
                 target_languages=['es'],
             )
 
-            result = await server.import_terminology.fn(params)
+            result = await server.import_terminology.fn(  # type: ignore
+                params
+            )
 
             assert result['name'] == 'imported-terms'
             assert result['status'] == 'IMPORTED'
@@ -722,7 +757,8 @@ class TestLanguageOperationsMCPTools:
         with patch.object(server, 'language_operations') as mock_lang:
             mock_lang.list_language_pairs.return_value = mock_pairs
 
-            result = await server.list_language_pairs.fn()
+            result = await server.list_language_pairs.fn(  # type: ignore
+            )
 
             assert result['total_count'] == 2
             assert len(result['language_pairs']) == 2
@@ -751,7 +787,9 @@ class TestLanguageOperationsMCPTools:
 
             params = server.GetLanguageMetricsParams(language_pair='en-es', time_range='24h')
 
-            result = await server.get_language_metrics.fn(params)
+            result = await server.get_language_metrics.fn(  # type: ignore
+                params
+            )
 
             assert result['language_pair'] == 'en-es'
             assert result['time_range'] == '24h'
@@ -797,7 +835,9 @@ class TestWorkflowMCPTools:
                 auto_detect_language=True,
             )
 
-            result = await server.smart_translate_workflow.fn(params)
+            result = await server.smart_translate_workflow.fn(  # type: ignore
+                params
+            )
 
             assert result['workflow_type'] == 'smart_translation'
             assert result['original_text'] == 'Hello world'
@@ -848,7 +888,9 @@ class TestWorkflowMCPTools:
                 max_monitoring_duration=3600,
             )
 
-            result = await server.managed_batch_translation_workflow.fn(params)
+            result = await server.managed_batch_translation_workflow.fn(  # type: ignore
+                params
+            )
 
             assert result['job_id'] == 'batch-job-123'
             assert result['status'] == 'COMPLETED'
@@ -882,7 +924,9 @@ class TestMCPToolAsyncioIntegration:
                 target_languages=['es'],
             )
 
-            result = await server.start_batch_translation.fn(params)
+            result = await server.start_batch_translation.fn(  # type: ignore
+                params
+            )
 
             # Verify executor was used
             mock_get_loop.assert_called_once()
@@ -906,7 +950,8 @@ class TestMCPToolAsyncioIntegration:
             mock_get_loop.return_value = mock_loop
             mock_loop.run_in_executor.return_value = {'terminologies': [], 'next_token': None}
 
-            result = await server.list_terminologies.fn()
+            result = await server.list_terminologies.fn(  # type: ignore
+            )
 
             # Verify executor was used
             mock_get_loop.assert_called_once()

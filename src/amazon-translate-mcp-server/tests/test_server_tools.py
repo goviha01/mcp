@@ -61,23 +61,25 @@ class TestServerToolsExecution:
         )
         self.mock_services['translation'].translate_text.return_value = mock_result
 
-        # Create parameters
-        params = server.TranslateTextParams(
-            text='Hello world',
-            source_language='en',
-            target_language='es',
-            terminology_names=['tech-terms'],
-        )
-
         # Execute the actual tool function
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.return_value = mock_result
             mock_loop.return_value.run_in_executor = mock_executor
 
-            # Get the actual function from the tool
-            tool_func = server.translate_text.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            # Call the function directly
+            result = await server.translate_text(
+                ctx=mock_ctx,
+                text='Hello world',
+                source_language='en',
+                target_language='es',
+                terminology_names=['tech-terms'],
+            )
 
         # Verify result
         assert result['translated_text'] == 'Hola mundo'
@@ -95,12 +97,14 @@ class TestServerToolsExecution:
         server.translation_service = None
 
         try:
-            params = server.TranslateTextParams(
-                text='Hello world', source_language='en', target_language='es'
-            )
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            tool_func = server.translate_text.fn
-            result = await tool_func(params)
+            mock_ctx = MagicMock()
+
+            result = await server.translate_text(
+                ctx=mock_ctx, text='Hello world', source_language='en', target_language='es'
+            )
 
             assert 'error' in result
             assert 'Translation service not initialized' in result['error']
@@ -115,17 +119,19 @@ class TestServerToolsExecution:
             'Translation failed'
         )
 
-        params = server.TranslateTextParams(
-            text='Hello world', source_language='en', target_language='es'
-        )
-
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.side_effect = TranslationError('Translation failed')
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.translate_text.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.translate_text(
+                ctx=mock_ctx, text='Hello world', source_language='en', target_language='es'
+            )
 
         assert 'error' in result
         assert 'Translation failed' in result['error']
@@ -140,15 +146,17 @@ class TestServerToolsExecution:
             alternative_languages=[('fr', 0.03), ('de', 0.02)],
         )
 
-        params = server.DetectLanguageParams(text='Hello world')
-
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.return_value = mock_result
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.detect_language.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.detect_language(ctx=mock_ctx, text='Hello world')
 
         assert result['detected_language'] == 'en'
         assert result['confidence_score'] == 0.95
@@ -162,10 +170,12 @@ class TestServerToolsExecution:
         server.translation_service = None
 
         try:
-            params = server.DetectLanguageParams(text='Hello world')
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            tool_func = server.detect_language.fn
-            result = await tool_func(params)
+            mock_ctx = MagicMock()
+
+            result = await server.detect_language(ctx=mock_ctx, text='Hello world')
 
             assert 'error' in result
             assert 'Translation service not initialized' in result['error']
@@ -179,20 +189,23 @@ class TestServerToolsExecution:
             is_valid=True, quality_score=0.92, issues=[], suggestions=['Great translation!']
         )
 
-        params = server.ValidateTranslationParams(
-            original_text='Hello world',
-            translated_text='Hola mundo',
-            source_language='en',
-            target_language='es',
-        )
-
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.return_value = mock_result
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.validate_translation.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.validate_translation(
+                ctx=mock_ctx,
+                original_text='Hello world',
+                translated_text='Hola mundo',
+                source_language='en',
+                target_language='es',
+            )
 
         assert result['is_valid'] is True
         assert result['quality_score'] == 0.92
@@ -204,22 +217,25 @@ class TestServerToolsExecution:
         """Test start_batch_translation tool execution."""
         self.mock_services['batch'].start_batch_translation.return_value = 'job-123'
 
-        params = server.StartBatchTranslationParams(
-            input_s3_uri='s3://bucket/input/',
-            output_s3_uri='s3://bucket/output/',
-            data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
-            job_name='test-job',
-            source_language='en',
-            target_languages=['es', 'fr'],
-        )
-
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.return_value = 'job-123'
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.start_batch_translation.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.start_batch_translation(
+                ctx=mock_ctx,
+                input_s3_uri='s3://bucket/input/',
+                output_s3_uri='s3://bucket/output/',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+                job_name='test-job',
+                source_language='en',
+                target_languages=['es', 'fr'],
+            )
 
         assert result['job_id'] == 'job-123'
         assert result['status'] == 'SUBMITTED'
@@ -238,15 +254,17 @@ class TestServerToolsExecution:
             completed_at=datetime.now(),
         )
 
-        params = server.GetTranslationJobParams(job_id='job-123')
-
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.return_value = mock_job
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.get_translation_job.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.get_translation_job(ctx=mock_ctx, job_id='job-123')
 
         assert result['job_id'] == 'job-123'
         assert result['job_name'] == 'test-job'
@@ -278,15 +296,17 @@ class TestServerToolsExecution:
             ),
         ]
 
-        params = server.ListTranslationJobsParams(max_results=10)
-
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.return_value = mock_jobs
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.list_translation_jobs.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.list_translation_jobs(ctx=mock_ctx, max_results=10)
 
         assert result['total_count'] == 2
         assert len(result['jobs']) == 2
@@ -313,8 +333,12 @@ class TestServerToolsExecution:
             mock_executor.return_value = {'terminologies': mock_terminologies, 'next_token': None}
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.list_terminologies.fn
-            result = await tool_func()
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.list_terminologies(ctx=mock_ctx)
 
         assert result['total_count'] == 1
         assert len(result['terminologies']) == 1
@@ -325,14 +349,6 @@ class TestServerToolsExecution:
     @pytest.mark.asyncio
     async def test_create_terminology_tool_success(self):
         """Test create_terminology tool execution."""
-        params = server.CreateTerminologyParams(
-            name='new-terminology',
-            description='New terminology',
-            source_language='en',
-            target_languages=['es', 'fr'],
-            terms=[{'source': 'hello', 'target': 'hola'}, {'source': 'world', 'target': 'mundo'}],
-        )
-
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.return_value = {
@@ -342,8 +358,22 @@ class TestServerToolsExecution:
             }
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.create_terminology.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.create_terminology(
+                ctx=mock_ctx,
+                name='new-terminology',
+                description='New terminology',
+                source_language='en',
+                target_languages=['es', 'fr'],
+                terms=[
+                    {'source': 'hello', 'target': 'hola'},
+                    {'source': 'world', 'target': 'mundo'},
+                ],
+            )
 
         assert result['name'] == 'new-terminology'
         assert result['status'] == 'CREATED'
@@ -353,15 +383,6 @@ class TestServerToolsExecution:
     @pytest.mark.asyncio
     async def test_import_terminology_tool_success(self):
         """Test import_terminology tool execution."""
-        params = server.ImportTerminologyParams(
-            name='imported-terminology',
-            description='Imported terminology',
-            source_language='en',
-            target_languages=['es'],
-            file_content='aGVsbG8saG9sYQ==',  # base64 encoded "hello,hola"
-            file_format='CSV',
-        )
-
         with patch('asyncio.get_event_loop') as mock_loop:
             mock_executor = AsyncMock()
             mock_executor.return_value = {
@@ -371,8 +392,20 @@ class TestServerToolsExecution:
             }
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.import_terminology.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.import_terminology(
+                ctx=mock_ctx,
+                name='imported-terminology',
+                description='Imported terminology',
+                source_language='en',
+                target_languages=['es'],
+                file_content='aGVsbG8saG9sYQ==',  # base64 encoded "hello,hola"
+                file_format='CSV',
+            )
 
         assert result['name'] == 'imported-terminology'
         assert result['status'] == 'IMPORTED'
@@ -382,8 +415,6 @@ class TestServerToolsExecution:
     @pytest.mark.asyncio
     async def test_get_terminology_tool_success(self):
         """Test get_terminology tool execution."""
-        params = server.GetTerminologyParams(name='tech-terms')
-
         from awslabs.amazon_translate_mcp_server.models import TerminologyDetails
 
         mock_terminology = TerminologyDetails(
@@ -400,8 +431,12 @@ class TestServerToolsExecution:
             mock_executor.return_value = mock_terminology
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.get_terminology.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.get_terminology(ctx=mock_ctx, name='tech-terms')
 
         assert result['name'] == 'tech-terms'
         assert result['description'] == 'Technical terms'
@@ -427,8 +462,12 @@ class TestServerToolsExecution:
             mock_executor.return_value = mock_pairs
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.list_language_pairs.fn
-            result = await tool_func()
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.list_language_pairs(ctx=mock_ctx)
 
         assert result['total_count'] == 2
         assert len(result['language_pairs']) == 2
@@ -439,8 +478,6 @@ class TestServerToolsExecution:
     @pytest.mark.asyncio
     async def test_get_language_metrics_tool_success(self):
         """Test get_language_metrics tool execution."""
-        params = server.GetLanguageMetricsParams(language_pair='en-es', time_range='24h')
-
         mock_metrics = LanguageMetrics(
             language_pair='en-es',
             time_range='24h',
@@ -455,8 +492,14 @@ class TestServerToolsExecution:
             mock_executor.return_value = mock_metrics
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.get_language_metrics.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.get_language_metrics(
+                ctx=mock_ctx, language_pair='en-es', time_range='24h'
+            )
 
         assert result['language_pair'] == 'en-es'
         assert result['translation_count'] == 100
@@ -492,15 +535,17 @@ class TestWorkflowTools:
             workflow_steps=['detect_language', 'translate_text', 'validate_translation'],
         )
 
-        params = server.SmartTranslateWorkflowParams(
-            text='Hello world', target_language='es', quality_threshold=0.8
-        )
-
         with patch.object(server, 'workflow_orchestrator') as mock_workflow:
             mock_workflow.smart_translate_workflow = AsyncMock(return_value=mock_result)
 
-            tool_func = server.smart_translate_workflow.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.smart_translate_workflow(
+                ctx=mock_ctx, text='Hello world', target_language='es', quality_threshold=0.8
+            )
 
         assert result['workflow_type'] == 'smart_translation'
         assert result['translated_text'] == 'Hola mundo'
@@ -530,20 +575,23 @@ class TestWorkflowTools:
             workflow_steps=['validate_language_pairs', 'start_batch_job', 'monitor_job_progress'],
         )
 
-        params = server.ManagedBatchTranslationWorkflowParams(
-            input_s3_uri='s3://bucket/input/',
-            output_s3_uri='s3://bucket/output/',
-            data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
-            job_name='test-workflow-job',
-            source_language='en',
-            target_languages=['es', 'fr'],
-        )
-
         with patch.object(server, 'workflow_orchestrator') as mock_workflow:
             mock_workflow.managed_batch_translation_workflow = AsyncMock(return_value=mock_result)
 
-            tool_func = server.managed_batch_translation_workflow.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.managed_batch_translation_workflow(
+                ctx=mock_ctx,
+                input_s3_uri='s3://bucket/input/',
+                output_s3_uri='s3://bucket/output/',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+                job_name='test-workflow-job',
+                source_language='en',
+                target_languages=['es', 'fr'],
+            )
 
         assert result['workflow_type'] == 'managed_batch_translation'
         assert result['job_id'] == 'job-123'
@@ -566,12 +614,16 @@ class TestWorkflowTools:
         with patch.object(server, 'workflow_orchestrator') as mock_workflow:
             mock_workflow.list_active_workflows.return_value = mock_workflows
 
-            tool_func = server.list_active_workflows.fn
-            result = await tool_func()
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.list_active_workflows(ctx=mock_ctx)
 
         assert result['total_count'] == 1
-        assert len(result['active_workflows']) == 1
-        assert result['active_workflows'][0]['workflow_id'] == 'workflow-1'
+        assert len(result['workflows']) == 1
+        assert result['workflows'][0]['workflow_id'] == 'workflow-1'
         assert 'error' not in result
 
 
@@ -585,11 +637,13 @@ class TestSeparateBatchTools:
             patch.object(server, 'workflow_orchestrator') as mock_workflow,
             patch.object(server, 'batch_manager') as mock_batch,
             patch.object(server, 'language_operations') as mock_lang,
+            patch.object(server, 'terminology_manager') as mock_term,
         ):
             self.mock_services = {
                 'workflow': mock_workflow,
                 'batch': mock_batch,
                 'language': mock_lang,
+                'terminology': mock_term,
             }
             yield
 
@@ -612,15 +666,6 @@ class TestSeparateBatchTools:
             created_at=datetime.now(),
         )
 
-        params = server.TriggerBatchTranslationParams(
-            input_s3_uri='s3://bucket/input/',
-            output_s3_uri='s3://bucket/output/',
-            data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
-            job_name='test-trigger-job',
-            source_language='en',
-            target_languages=['es'],
-        )
-
         with patch('asyncio.get_event_loop') as mock_loop:
             # Mock the validation and job creation
             mock_executor = AsyncMock()
@@ -631,8 +676,21 @@ class TestSeparateBatchTools:
             ]
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.trigger_batch_translation.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.trigger_batch_translation(
+                ctx=mock_ctx,
+                input_s3_uri='s3://bucket/input/',
+                output_s3_uri='s3://bucket/output/',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+                job_name='test-trigger-job',
+                source_language='en',
+                target_languages=['es'],
+                terminology_names=None,
+            )
 
         assert result['job_id'] == 'job-456'
         assert result['status'] == 'SUBMITTED'
@@ -669,13 +727,6 @@ class TestSeparateBatchTools:
             ),
         ]
 
-        params = server.MonitorBatchTranslationParams(
-            job_id='job-456',
-            output_s3_uri='s3://bucket/output/',
-            monitor_interval=1,
-            max_monitoring_duration=10,
-        )
-
         with (
             patch('asyncio.get_event_loop') as mock_loop,
             patch('asyncio.sleep', new_callable=AsyncMock),
@@ -684,8 +735,18 @@ class TestSeparateBatchTools:
             mock_executor.side_effect = job_statuses
             mock_loop.return_value.run_in_executor = mock_executor
 
-            tool_func = server.monitor_batch_translation.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.monitor_batch_translation(
+                ctx=mock_ctx,
+                job_id='job-456',
+                output_s3_uri='s3://bucket/output/',
+                monitor_interval=1,
+                max_monitoring_duration=10,
+            )
 
         assert result['job_id'] == 'job-456'
         assert result['final_status'] == 'COMPLETED'
@@ -712,15 +773,17 @@ class TestSeparateBatchTools:
             'suggested_actions': ['Check file encoding', 'Verify file format'],
         }
 
-        params = server.AnalyzeBatchTranslationErrorsParams(
-            job_id='failed-job-123', output_s3_uri='s3://bucket/output/'
-        )
-
         with patch.object(server, 'workflow_orchestrator') as mock_workflow:
             mock_workflow._analyze_job_errors = AsyncMock(return_value=mock_error_analysis)
 
-            tool_func = server.analyze_batch_translation_errors.fn
-            result = await tool_func(params)
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.analyze_batch_translation_errors(
+                ctx=mock_ctx, job_id='failed-job-123', output_s3_uri='s3://bucket/output/'
+            )
 
         assert result['job_id'] == 'failed-job-123'
         assert len(result['error_files_found']) == 2

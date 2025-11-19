@@ -40,7 +40,7 @@ from .terminology_manager import TerminologyManager
 from .translation_service import TranslationService
 from .workflow_orchestrator import WorkflowOrchestrator
 from datetime import datetime
-from fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 
@@ -266,7 +266,15 @@ def initialize_services() -> None:
 
 
 @mcp.tool()
-async def translate_text(params: TranslateTextParams) -> Dict[str, Any]:
+async def translate_text(
+    ctx: Context,
+    text: str = Field(..., description='Text to translate'),
+    source_language: str = Field(..., description="Source language code (e.g., 'en', 'es', 'fr')"),
+    target_language: str = Field(..., description="Target language code (e.g., 'en', 'es', 'fr')"),
+    terminology_names: Optional[List[str]] = Field(
+        default=None, description='List of custom terminology names to apply'
+    ),
+) -> Dict[str, Any]:
     """Translate text from one language to another using Amazon Translate.
 
     This tool provides real-time text translation with support for custom terminology
@@ -281,10 +289,10 @@ async def translate_text(params: TranslateTextParams) -> Dict[str, Any]:
         result = await loop.run_in_executor(
             None,
             translation_service.translate_text,
-            params.text,
-            params.source_language,
-            params.target_language,
-            params.terminology_names or [],
+            text,
+            source_language,
+            target_language,
+            terminology_names or [],
         )
 
         return {
@@ -301,7 +309,9 @@ async def translate_text(params: TranslateTextParams) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def detect_language(params: DetectLanguageParams) -> Dict[str, Any]:
+async def detect_language(
+    ctx: Context, text: str = Field(..., description='Text to analyze for language detection')
+) -> Dict[str, Any]:
     """Detect the language of the provided text using Amazon Translate.
 
     Returns the detected language with confidence score and alternative language candidates.
@@ -312,7 +322,7 @@ async def detect_language(params: DetectLanguageParams) -> Dict[str, Any]:
 
         # Run synchronous method in thread pool
         loop = asyncio.get_event_loop()
-        result = await loop.run_in_executor(None, translation_service.detect_language, params.text)
+        result = await loop.run_in_executor(None, translation_service.detect_language, text)
 
         return {
             'detected_language': result.detected_language,
@@ -326,7 +336,13 @@ async def detect_language(params: DetectLanguageParams) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def validate_translation(params: ValidateTranslationParams) -> Dict[str, Any]:
+async def validate_translation(
+    ctx: Context,
+    original_text: str = Field(..., description='Original text in source language'),
+    translated_text: str = Field(..., description='Translated text to validate'),
+    source_language: str = Field(..., description='Source language code'),
+    target_language: str = Field(..., description='Target language code'),
+) -> Dict[str, Any]:
     """Validate the quality of a translation using various quality checks.
 
     Performs quality assessment and provides suggestions for improvement.
@@ -340,10 +356,10 @@ async def validate_translation(params: ValidateTranslationParams) -> Dict[str, A
         result = await loop.run_in_executor(
             None,
             translation_service.validate_translation,
-            params.original_text,
-            params.translated_text,
-            params.source_language,
-            params.target_language,
+            original_text,
+            translated_text,
+            source_language,
+            target_language,
         )
 
         return {
@@ -359,7 +375,24 @@ async def validate_translation(params: ValidateTranslationParams) -> Dict[str, A
 
 
 @mcp.tool()
-async def start_batch_translation(params: StartBatchTranslationParams) -> Dict[str, Any]:
+async def start_batch_translation(
+    ctx: Context,
+    input_s3_uri: str = Field(..., description='S3 URI for input documents'),
+    output_s3_uri: str = Field(..., description='S3 URI for output location'),
+    data_access_role_arn: str = Field(..., description='IAM role ARN for S3 access'),
+    job_name: str = Field(..., description='Name for the translation job'),
+    source_language: str = Field(..., description='Source language code'),
+    target_languages: List[str] = Field(..., description='List of target language codes'),
+    terminology_names: Optional[List[str]] = Field(
+        default=None, description='List of custom terminology names'
+    ),
+    parallel_data_names: Optional[List[str]] = Field(
+        default=None, description='List of parallel data names'
+    ),
+    client_token: Optional[str] = Field(
+        default=None, description='Unique identifier for the request'
+    ),
+) -> Dict[str, Any]:
     """Start a batch translation job for processing multiple documents.
 
     Supports various document formats and custom terminology application.
@@ -373,20 +406,20 @@ async def start_batch_translation(params: StartBatchTranslationParams) -> Dict[s
 
         # Create configuration objects
         input_config = BatchInputConfig(
-            s3_uri=params.input_s3_uri,
-            content_type=params.content_type,
-            data_access_role_arn=params.data_access_role_arn,
+            s3_uri=input_s3_uri,
+            content_type='text/plain',  # Default content type
+            data_access_role_arn=data_access_role_arn,
         )
 
         output_config = BatchOutputConfig(
-            s3_uri=params.output_s3_uri, data_access_role_arn=params.data_access_role_arn
+            s3_uri=output_s3_uri, data_access_role_arn=data_access_role_arn
         )
 
         job_config = JobConfig(
-            job_name=params.job_name,
-            source_language_code=params.source_language,
-            target_language_codes=params.target_languages,
-            terminology_names=params.terminology_names or [],
+            job_name=job_name,
+            source_language_code=source_language,
+            target_language_codes=target_languages,
+            terminology_names=terminology_names or [],
         )
 
         # Run synchronous method in thread pool
@@ -407,7 +440,9 @@ async def start_batch_translation(params: StartBatchTranslationParams) -> Dict[s
 
 
 @mcp.tool()
-async def get_translation_job(params: GetTranslationJobParams) -> Dict[str, Any]:
+async def get_translation_job(
+    ctx: Context, job_id: str = Field(..., description='Translation job ID to retrieve')
+) -> Dict[str, Any]:
     """Get the status and details of a translation job.
 
     Returns current job status, progress, and results location when completed.
@@ -418,9 +453,7 @@ async def get_translation_job(params: GetTranslationJobParams) -> Dict[str, Any]
 
         # Run synchronous method in thread pool
         loop = asyncio.get_event_loop()
-        job_status = await loop.run_in_executor(
-            None, batch_manager.get_translation_job, params.job_id
-        )
+        job_status = await loop.run_in_executor(None, batch_manager.get_translation_job, job_id)
 
         return {
             'job_id': job_status.job_id,
@@ -449,7 +482,14 @@ async def get_translation_job(params: GetTranslationJobParams) -> Dict[str, Any]
 
 
 @mcp.tool()
-async def list_translation_jobs(params: ListTranslationJobsParams) -> Dict[str, Any]:
+async def list_translation_jobs(
+    ctx: Context,
+    max_results: int = Field(default=50, description='Maximum number of jobs to return'),
+    status_filter: Optional[str] = Field(
+        default=None, description='Filter jobs by status (SUBMITTED, IN_PROGRESS, COMPLETED, etc.)'
+    ),
+    next_token: Optional[str] = Field(default=None, description='Token for pagination'),
+) -> Dict[str, Any]:
     """List translation jobs with optional status filtering.
 
     Returns a list of jobs with their current status and metadata.
@@ -461,15 +501,15 @@ async def list_translation_jobs(params: ListTranslationJobsParams) -> Dict[str, 
         # Run synchronous method in thread pool
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
-            None, batch_manager.list_translation_jobs, params.status_filter, params.max_results
+            None, batch_manager.list_translation_jobs, status_filter, max_results
         )
 
         if isinstance(result, list):
             jobs: List[TranslationJobSummary] = result
-            next_token = None
+            result_next_token = None
         else:
             jobs: List[TranslationJobSummary] = result.get('jobs', [])
-            next_token = result.get('next_token')
+            result_next_token = result.get('next_token')
 
         job_list = []
         for job in jobs:
@@ -490,7 +530,7 @@ async def list_translation_jobs(params: ListTranslationJobsParams) -> Dict[str, 
                 }
             )
 
-        return {'jobs': job_list, 'total_count': len(job_list), 'next_token': next_token}
+        return {'jobs': job_list, 'total_count': len(job_list), 'next_token': result_next_token}
 
     except Exception as e:
         logger.error(f'Failed to list translation jobs: {e}')
@@ -498,7 +538,7 @@ async def list_translation_jobs(params: ListTranslationJobsParams) -> Dict[str, 
 
 
 @mcp.tool()
-async def list_terminologies() -> Dict[str, Any]:
+async def list_terminologies(ctx: Context) -> Dict[str, Any]:
     """List all available custom terminologies.
 
     Returns a list of terminologies with their metadata and language pairs.
@@ -546,7 +586,14 @@ async def list_terminologies() -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def create_terminology(params: CreateTerminologyParams) -> Dict[str, Any]:
+async def create_terminology(
+    ctx: Context,
+    name: str = Field(..., description='Name for the terminology'),
+    description: str = Field(..., description='Description of the terminology'),
+    source_language: str = Field(..., description='Source language code'),
+    target_languages: List[str] = Field(..., description='List of target language codes'),
+    terms: List[Dict[str, str]] = Field(..., description='List of term pairs (source/target)'),
+) -> Dict[str, Any]:
     """Create a new custom terminology for consistent translations.
 
     Accepts term pairs and creates a terminology that can be applied to translations.
@@ -560,7 +607,7 @@ async def create_terminology(params: CreateTerminologyParams) -> Dict[str, Any]:
 
         # Convert terms to CSV format
         csv_content = 'source,target\n'
-        for term in params.terms:
+        for term in terms:
             source = term.get('source', '')
             target = term.get('target', '')
             csv_content += f'"{source}","{target}"\n'
@@ -575,14 +622,14 @@ async def create_terminology(params: CreateTerminologyParams) -> Dict[str, Any]:
         terminology_arn = await loop.run_in_executor(
             None,
             terminology_manager.create_terminology,
-            params.name,
-            params.description,
+            name,
+            description,
             terminology_data,
         )
 
         return {
             'terminology_arn': terminology_arn,
-            'name': params.name,
+            'name': name,
             'status': 'CREATED',
             'message': 'Terminology created successfully',
         }
@@ -593,7 +640,15 @@ async def create_terminology(params: CreateTerminologyParams) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def import_terminology(params: ImportTerminologyParams) -> Dict[str, Any]:
+async def import_terminology(
+    ctx: Context,
+    name: str = Field(..., description='Name for the terminology'),
+    description: str = Field(..., description='Description of the terminology'),
+    file_content: str = Field(..., description='Base64 encoded terminology file content'),
+    file_format: str = Field(..., description='File format (CSV or TMX)'),
+    source_language: str = Field(..., description='Source language code'),
+    target_languages: List[str] = Field(..., description='List of target language codes'),
+) -> Dict[str, Any]:
     """Import terminology from a file (CSV or TMX format).
 
     Supports importing terminology data from external files for consistent translations.
@@ -607,13 +662,13 @@ async def import_terminology(params: ImportTerminologyParams) -> Dict[str, Any]:
         import tempfile
 
         # Decode base64 file content
-        file_content = base64.b64decode(params.file_content)
+        decoded_content = base64.b64decode(file_content)
 
         # Create temporary file
         with tempfile.NamedTemporaryFile(
-            delete=False, suffix=f'.{params.file_format.lower()}'
+            delete=False, suffix=f'.{file_format.lower()}'
         ) as temp_file:
-            temp_file.write(file_content)
+            temp_file.write(decoded_content)
             temp_file_path = temp_file.name
 
         try:
@@ -622,17 +677,17 @@ async def import_terminology(params: ImportTerminologyParams) -> Dict[str, Any]:
             terminology_arn = await loop.run_in_executor(
                 None,
                 terminology_manager.import_terminology,
-                params.name,
+                name,
                 temp_file_path,
-                params.description,
-                params.source_language,
-                params.target_languages,
-                params.file_format,
+                description,
+                source_language,
+                target_languages,
+                file_format,
             )
 
             return {
                 'terminology_arn': terminology_arn,
-                'name': params.name,
+                'name': name,
                 'status': 'IMPORTED',
                 'message': 'Terminology imported successfully',
             }
@@ -647,7 +702,9 @@ async def import_terminology(params: ImportTerminologyParams) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def get_terminology(params: GetTerminologyParams) -> Dict[str, Any]:
+async def get_terminology(
+    ctx: Context, name: str = Field(..., description='Name of the terminology to retrieve')
+) -> Dict[str, Any]:
     """Get detailed information about a specific terminology.
 
     Returns terminology metadata, term pairs, and usage statistics.
@@ -658,9 +715,7 @@ async def get_terminology(params: GetTerminologyParams) -> Dict[str, Any]:
 
         # Run synchronous method in thread pool
         loop = asyncio.get_event_loop()
-        terminology = await loop.run_in_executor(
-            None, terminology_manager.get_terminology, params.name
-        )
+        terminology = await loop.run_in_executor(None, terminology_manager.get_terminology, name)
 
         return {
             'name': terminology.name,
@@ -682,7 +737,7 @@ async def get_terminology(params: GetTerminologyParams) -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def list_language_pairs() -> Dict[str, Any]:
+async def list_language_pairs(ctx: Context) -> Dict[str, Any]:
     """List all supported language pairs for translation.
 
     Returns all available source-target language combinations with their capabilities.
@@ -714,7 +769,15 @@ async def list_language_pairs() -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def get_language_metrics(params: GetLanguageMetricsParams) -> Dict[str, Any]:
+async def get_language_metrics(
+    ctx: Context,
+    language_pair: Optional[str] = Field(
+        default=None, description="Language pair (e.g., 'en-es')"
+    ),
+    time_range: Optional[str] = Field(
+        default='24h', description='Time range for metrics (24h, 7d, 30d)'
+    ),
+) -> Dict[str, Any]:
     """Get usage metrics and statistics for language operations.
 
     Returns translation volume, performance metrics, and usage patterns.
@@ -726,7 +789,7 @@ async def get_language_metrics(params: GetLanguageMetricsParams) -> Dict[str, An
         # Run synchronous method in thread pool
         loop = asyncio.get_event_loop()
         metrics = await loop.run_in_executor(
-            None, language_operations.get_language_metrics, params.language_pair, params.time_range
+            None, language_operations.get_language_metrics, language_pair, time_range or '24h'
         )
 
         return {
@@ -747,7 +810,20 @@ async def get_language_metrics(params: GetLanguageMetricsParams) -> Dict[str, An
 
 
 @mcp.tool()
-async def smart_translate_workflow(params: SmartTranslateWorkflowParams) -> Dict[str, Any]:
+async def smart_translate_workflow(
+    ctx: Context,
+    text: str = Field(..., description='Text to translate'),
+    target_language: str = Field(..., description='Target language code'),
+    quality_threshold: float = Field(
+        default=0.8, description='Minimum quality score threshold (0.0-1.0)'
+    ),
+    terminology_names: Optional[List[str]] = Field(
+        default=None, description='List of custom terminology names'
+    ),
+    auto_detect_language: bool = Field(
+        default=True, description='Whether to auto-detect source language'
+    ),
+) -> Dict[str, Any]:
     """Execute intelligent translation workflow with automatic language detection and quality validation.
 
     This workflow combines multiple translation operations into a single, intelligent process:
@@ -769,11 +845,11 @@ async def smart_translate_workflow(params: SmartTranslateWorkflowParams) -> Dict
 
         # Execute workflow
         result = await workflow_orchestrator.smart_translate_workflow(
-            text=params.text,
-            target_language=params.target_language,
-            quality_threshold=params.quality_threshold,
-            terminology_names=params.terminology_names,
-            auto_detect_language=params.auto_detect_language,
+            text=text,
+            target_language=target_language,
+            quality_threshold=quality_threshold,
+            terminology_names=terminology_names,
+            auto_detect_language=auto_detect_language,
         )
 
         return {
@@ -799,7 +875,21 @@ async def smart_translate_workflow(params: SmartTranslateWorkflowParams) -> Dict
 
 @mcp.tool()
 async def managed_batch_translation_workflow(
-    params: ManagedBatchTranslationWorkflowParams,
+    ctx: Context,
+    input_s3_uri: str = Field(..., description='S3 URI for input documents'),
+    output_s3_uri: str = Field(..., description='S3 URI for output location'),
+    data_access_role_arn: str = Field(..., description='IAM role ARN for S3 access'),
+    job_name: str = Field(..., description='Name for the translation job'),
+    source_language: str = Field(..., description='Source language code'),
+    target_languages: List[str] = Field(..., description='List of target language codes'),
+    terminology_names: Optional[List[str]] = Field(
+        default=None, description='List of custom terminology names'
+    ),
+    content_type: str = Field(default='text/plain', description='Content type of input documents'),
+    monitor_interval: int = Field(default=30, description='Monitoring interval in seconds'),
+    max_monitoring_duration: int = Field(
+        default=3600, description='Maximum monitoring duration in seconds'
+    ),
 ) -> Dict[str, Any]:
     """Execute managed batch translation workflow with comprehensive monitoring and analytics.
 
@@ -822,16 +912,16 @@ async def managed_batch_translation_workflow(
 
         # Execute workflow
         result = await workflow_orchestrator.managed_batch_translation_workflow(
-            input_s3_uri=params.input_s3_uri,
-            output_s3_uri=params.output_s3_uri,
-            data_access_role_arn=params.data_access_role_arn,
-            job_name=params.job_name,
-            source_language=params.source_language,
-            target_languages=params.target_languages,
-            terminology_names=params.terminology_names,
-            content_type=params.content_type,
-            monitor_interval=params.monitor_interval,
-            max_monitoring_duration=params.max_monitoring_duration,
+            input_s3_uri=input_s3_uri,
+            output_s3_uri=output_s3_uri,
+            data_access_role_arn=data_access_role_arn,
+            job_name=job_name,
+            source_language=source_language,
+            target_languages=target_languages,
+            terminology_names=terminology_names,
+            content_type=content_type,
+            monitor_interval=monitor_interval,
+            max_monitoring_duration=max_monitoring_duration,
         )
 
         return {
@@ -862,7 +952,19 @@ async def managed_batch_translation_workflow(
 
 
 @mcp.tool()
-async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Dict[str, Any]:
+async def trigger_batch_translation(
+    ctx: Context,
+    input_s3_uri: str = Field(..., description='S3 URI for input documents'),
+    output_s3_uri: str = Field(..., description='S3 URI for output location'),
+    data_access_role_arn: str = Field(..., description='IAM role ARN for S3 access'),
+    job_name: str = Field(..., description='Name for the translation job'),
+    source_language: str = Field(..., description='Source language code'),
+    target_languages: List[str] = Field(..., description='List of target language codes'),
+    terminology_names: Optional[List[str]] = Field(
+        default=None, description='List of custom terminology names'
+    ),
+    content_type: str = Field(default='text/plain', description='Content type of input documents'),
+) -> Dict[str, Any]:
     """Trigger a batch translation job without monitoring.
 
     This tool starts a batch translation job and returns immediately with the job ID.
@@ -891,21 +993,16 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
 
         validation_results: Dict[str, Any] = {'supported_pairs': [], 'unsupported_pairs': []}
 
-        for target_lang in params.target_languages:
+        for target_lang in target_languages:
             pair_supported = any(
-                pair.source_language == params.source_language
-                and pair.target_language == target_lang
+                pair.source_language == source_language and pair.target_language == target_lang
                 for pair in language_pairs
             )
 
             if pair_supported:
-                validation_results['supported_pairs'].append(
-                    f'{params.source_language}->{target_lang}'
-                )
+                validation_results['supported_pairs'].append(f'{source_language}->{target_lang}')
             else:
-                validation_results['unsupported_pairs'].append(
-                    f'{params.source_language}->{target_lang}'
-                )
+                validation_results['unsupported_pairs'].append(f'{source_language}->{target_lang}')
 
         if validation_results['unsupported_pairs']:
             raise ValidationError(
@@ -914,7 +1011,7 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
             )
 
         # Validate terminologies if provided
-        if params.terminology_names:
+        if terminology_names:
             if not terminology_manager:
                 raise BatchJobError('Terminology manager not initialized')
 
@@ -926,7 +1023,7 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
             ]
 
             missing_terminologies = [
-                name for name in params.terminology_names if name not in available_terminologies
+                name for name in terminology_names if name not in available_terminologies
             ]
 
             if missing_terminologies:
@@ -939,7 +1036,7 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
                 )
 
             validation_results['terminologies'] = {
-                'requested': params.terminology_names,
+                'requested': terminology_names,
                 'available': available_terminologies,
                 'validated': True,
             }
@@ -948,20 +1045,20 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
         from .models import BatchInputConfig, BatchOutputConfig, JobConfig
 
         input_config = BatchInputConfig(
-            s3_uri=params.input_s3_uri,
-            content_type=params.content_type,
-            data_access_role_arn=params.data_access_role_arn,
+            s3_uri=input_s3_uri,
+            content_type=content_type,
+            data_access_role_arn=data_access_role_arn,
         )
 
         output_config = BatchOutputConfig(
-            s3_uri=params.output_s3_uri, data_access_role_arn=params.data_access_role_arn
+            s3_uri=output_s3_uri, data_access_role_arn=data_access_role_arn
         )
 
         job_config = JobConfig(
-            job_name=params.job_name,
-            source_language_code=params.source_language,
-            target_language_codes=params.target_languages,
-            terminology_names=params.terminology_names or [],
+            job_name=job_name,
+            source_language_code=source_language,
+            target_language_codes=target_languages,
+            terminology_names=terminology_names or [],
         )
 
         # Start the batch translation job
@@ -974,13 +1071,13 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
 
         return {
             'job_id': job_id,
-            'job_name': params.job_name,
+            'job_name': job_name,
             'status': job_status.status,
-            'source_language': params.source_language,
-            'target_languages': params.target_languages,
-            'input_s3_uri': params.input_s3_uri,
-            'output_s3_uri': params.output_s3_uri,
-            'terminology_names': params.terminology_names or [],
+            'source_language': source_language,
+            'target_languages': target_languages,
+            'input_s3_uri': input_s3_uri,
+            'output_s3_uri': output_s3_uri,
+            'terminology_names': terminology_names or [],
             'validation_results': validation_results,
             'created_at': job_status.created_at.isoformat() if job_status.created_at else None,
             'message': 'Batch translation job started successfully. Use monitor_batch_translation to track progress.',
@@ -992,7 +1089,15 @@ async def trigger_batch_translation(params: TriggerBatchTranslationParams) -> Di
 
 
 @mcp.tool()
-async def monitor_batch_translation(params: MonitorBatchTranslationParams) -> Dict[str, Any]:
+async def monitor_batch_translation(
+    ctx: Context,
+    job_id: str = Field(..., description='Translation job ID to monitor'),
+    output_s3_uri: str = Field(..., description='S3 URI for output location'),
+    monitor_interval: int = Field(default=30, description='Monitoring interval in seconds'),
+    max_monitoring_duration: int = Field(
+        default=3600, description='Maximum monitoring duration in seconds'
+    ),
+) -> Dict[str, Any]:
     """Monitor a batch translation job until completion or failure.
 
     This tool continuously monitors a batch translation job and returns when it reaches
@@ -1018,7 +1123,7 @@ async def monitor_batch_translation(params: MonitorBatchTranslationParams) -> Di
         monitoring_history = []
         start_time = time.time()
 
-        logger.info(f'Starting monitoring for job {params.job_id}')
+        logger.info(f'Starting monitoring for job {job_id}')
 
         # Monitor continuously until job reaches final state
         while True:
@@ -1026,7 +1131,7 @@ async def monitor_batch_translation(params: MonitorBatchTranslationParams) -> Di
 
             # Get job status
             job_status = await loop.run_in_executor(
-                None, batch_manager.get_translation_job, params.job_id
+                None, batch_manager.get_translation_job, job_id
             )
 
             # Record monitoring data
@@ -1039,34 +1144,34 @@ async def monitor_batch_translation(params: MonitorBatchTranslationParams) -> Di
             monitoring_history.append(monitoring_entry)
 
             logger.info(
-                f'Job {params.job_id} status: {job_status.status}, '
+                f'Job {job_id} status: {job_status.status}, '
                 f'progress: {job_status.progress}%, '
                 f'elapsed: {current_time - start_time:.1f}s'
             )
 
             # Check if job reached final state
             if job_status.status in ['COMPLETED', 'FAILED', 'STOPPED']:
-                logger.info(f'Job {params.job_id} reached final state: {job_status.status}')
+                logger.info(f'Job {job_id} reached final state: {job_status.status}')
                 break
 
             # Check if we've exceeded maximum monitoring duration
-            if current_time - start_time > params.max_monitoring_duration:
+            if current_time - start_time > max_monitoring_duration:
                 logger.warning(
-                    f'Monitoring duration exceeded {params.max_monitoring_duration}s for job {params.job_id}. '
+                    f'Monitoring duration exceeded {max_monitoring_duration}s for job {job_id}. '
                     f'Job is still {job_status.status}. Stopping monitoring but job continues.'
                 )
                 break
 
             # Wait before next check
-            await asyncio.sleep(params.monitor_interval)
+            await asyncio.sleep(monitor_interval)
 
         # Analyze errors if job failed
         error_analysis = None
         if job_status and job_status.status == 'FAILED':
-            logger.info(f'Analyzing errors for failed job {params.job_id}')
+            logger.info(f'Analyzing errors for failed job {job_id}')
 
             error_analysis = await workflow_orchestrator._analyze_job_errors(
-                params.job_id, params.output_s3_uri, loop
+                job_id, output_s3_uri, loop
             )
 
         # Calculate performance metrics
@@ -1081,7 +1186,7 @@ async def monitor_batch_translation(params: MonitorBatchTranslationParams) -> Di
         }
 
         return {
-            'job_id': params.job_id,
+            'job_id': job_id,
             'final_status': job_status.status if job_status else 'UNKNOWN',
             'progress': job_status.progress if job_status else None,
             'monitoring_history': monitoring_history,
@@ -1103,7 +1208,9 @@ async def monitor_batch_translation(params: MonitorBatchTranslationParams) -> Di
 
 @mcp.tool()
 async def analyze_batch_translation_errors(
-    params: AnalyzeBatchTranslationErrorsParams,
+    ctx: Context,
+    job_id: str = Field(..., description='Translation job ID to analyze'),
+    output_s3_uri: str = Field(..., description='S3 URI for output location'),
 ) -> Dict[str, Any]:
     """Analyze errors from a failed batch translation job.
 
@@ -1124,16 +1231,16 @@ async def analyze_batch_translation_errors(
 
         loop = asyncio.get_event_loop()
 
-        logger.info(f'Analyzing errors for job {params.job_id}')
+        logger.info(f'Analyzing errors for job {job_id}')
 
         # Perform error analysis
         error_analysis = await workflow_orchestrator._analyze_job_errors(
-            params.job_id, params.output_s3_uri, loop
+            job_id, output_s3_uri, loop
         )
 
         if not error_analysis:
             return {
-                'job_id': params.job_id,
+                'job_id': job_id,
                 'error': 'No error details found for this job',
                 'message': "Either the job didn't fail, or error details are not yet available in S3",
             }
@@ -1183,7 +1290,7 @@ async def analyze_batch_translation_errors(
                                     )
 
         return {
-            'job_id': params.job_id,
+            'job_id': job_id,
             'error_files_found': error_analysis.get('error_files_found', []),
             'error_details': error_analysis.get('error_details', []),
             'suggested_actions': error_analysis.get('suggested_actions', []),
@@ -1198,7 +1305,7 @@ async def analyze_batch_translation_errors(
 
 
 @mcp.tool()
-async def list_active_workflows() -> Dict[str, Any]:
+async def list_active_workflows(ctx: Context) -> Dict[str, Any]:
     """List all currently active workflows.
 
     Returns information about workflows that are currently executing,
@@ -1210,7 +1317,7 @@ async def list_active_workflows() -> Dict[str, Any]:
 
         active_workflows = workflow_orchestrator.list_active_workflows()
 
-        return {'active_workflows': active_workflows, 'total_count': len(active_workflows)}
+        return {'workflows': active_workflows, 'total_count': len(active_workflows)}
 
     except Exception as e:
         logger.error(f'Failed to list active workflows: {e}')
@@ -1218,7 +1325,9 @@ async def list_active_workflows() -> Dict[str, Any]:
 
 
 @mcp.tool()
-async def get_workflow_status(workflow_id: str) -> Dict[str, Any]:
+async def get_workflow_status(
+    ctx: Context, workflow_id: str = Field(..., description='Workflow ID to check status for')
+) -> Dict[str, Any]:
     """Get the current status of a specific workflow.
 
     Returns detailed information about workflow progress, current step,

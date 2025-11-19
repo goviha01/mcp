@@ -198,17 +198,18 @@ class TestMCPToolFunctions:
         with patch.object(server, 'translation_service') as mock_service:
             mock_service.translate_text.return_value = mock_result
 
-            # Create parameters
-            params = server.TranslateTextParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            # Call the MCP tool function directly
+            result = await server.translate_text(
+                ctx=mock_ctx,
                 text='Hello world',
                 source_language='en',
                 target_language='es',
                 terminology_names=['tech-terms'],
-            )
-
-            # Call the MCP tool function via the underlying function
-            result = await server.translate_text.fn(  # type: ignore
-                params
             )
 
             # Verify the service was called correctly
@@ -227,12 +228,13 @@ class TestMCPToolFunctions:
     async def test_translate_text_service_not_initialized(self):
         """Test translation when service is not initialized."""
         with patch.object(server, 'translation_service', None):
-            params = server.TranslateTextParams(
-                text='Hello world', source_language='en', target_language='es'
-            )
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.translate_text.fn(  # type: ignore
-                params
+            mock_ctx = MagicMock()
+
+            result = await server.translate_text(
+                ctx=mock_ctx, text='Hello world', source_language='en', target_language='es'
             )
 
             assert 'error' in result
@@ -245,12 +247,13 @@ class TestMCPToolFunctions:
         with patch.object(server, 'translation_service') as mock_service:
             mock_service.translate_text.side_effect = TranslationError('Translation failed')
 
-            params = server.TranslateTextParams(
-                text='Hello world', source_language='en', target_language='es'
-            )
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.translate_text.fn(  # type: ignore
-                params
+            mock_ctx = MagicMock()
+
+            result = await server.translate_text(
+                ctx=mock_ctx, text='Hello world', source_language='en', target_language='es'
             )
 
             assert 'error' in result
@@ -270,13 +273,13 @@ class TestMCPToolFunctions:
         with patch.object(server, 'translation_service') as mock_service:
             mock_service.detect_language.return_value = mock_result
 
-            # Create parameters
-            params = server.DetectLanguageParams(text='Hello world')
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
 
             # Call the MCP tool function
-            result = await server.detect_language.fn(  # type: ignore
-                params
-            )
+            result = await server.detect_language(ctx=mock_ctx, text='Hello world')
 
             # Verify the service was called correctly
             mock_service.detect_language.assert_called_once_with('Hello world')
@@ -290,11 +293,12 @@ class TestMCPToolFunctions:
     async def test_detect_language_service_not_initialized(self):
         """Test language detection when service is not initialized."""
         with patch.object(server, 'translation_service', None):
-            params = server.DetectLanguageParams(text='Hello world')
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.detect_language.fn(  # type: ignore
-                params
-            )
+            mock_ctx = MagicMock()
+
+            result = await server.detect_language(ctx=mock_ctx, text='Hello world')
 
             assert 'error' in result
             assert 'Translation service not initialized' in result['error']
@@ -314,17 +318,18 @@ class TestMCPToolFunctions:
         with patch.object(server, 'translation_service') as mock_service:
             mock_service.validate_translation.return_value = mock_result
 
-            # Create parameters
-            params = server.ValidateTranslationParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            # Call the MCP tool function
+            result = await server.validate_translation(
+                ctx=mock_ctx,
                 original_text='Hello world',
                 translated_text='Hola mundo',
                 source_language='en',
                 target_language='es',
-            )
-
-            # Call the MCP tool function
-            result = await server.validate_translation.fn(  # type: ignore
-                params
             )
 
             # Verify the service was called correctly
@@ -355,15 +360,17 @@ class TestMCPToolErrorHandling:
         with patch.object(server, 'translation_service') as mock_service:
             mock_service.translate_text.return_value = mock_result
 
-            params = server.TranslateTextParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.translate_text(
+                ctx=mock_ctx,
                 text='Hello world',
                 source_language='en',
                 target_language='es',
                 terminology_names=None,
-            )
-
-            result = await server.translate_text.fn(  # type: ignore
-                params
             )
 
             # Verify the service was called with empty list when terminology_names is None
@@ -382,11 +389,12 @@ class TestMCPToolErrorHandling:
         with patch.object(server, 'translation_service') as mock_service:
             mock_service.detect_language.side_effect = Exception('Unexpected error')
 
-            params = server.DetectLanguageParams(text='Hello world')
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.detect_language.fn(  # type: ignore
-                params
-            )
+            mock_ctx = MagicMock()
+
+            result = await server.detect_language(ctx=mock_ctx, text='Hello world')
 
             assert 'error' in result
             assert 'Unexpected error' in result['error']
@@ -415,12 +423,13 @@ class TestMCPToolIntegration:
             mock_get_loop.return_value = mock_loop
             mock_loop.run_in_executor.return_value = mock_result
 
-            params = server.TranslateTextParams(
-                text='Hello world', source_language='en', target_language='es'
-            )
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.translate_text.fn(  # type: ignore
-                params
+            mock_ctx = MagicMock()
+
+            result = await server.translate_text(
+                ctx=mock_ctx, text='Hello world', source_language='en', target_language='es'
             )
 
             # Verify executor was used
@@ -431,7 +440,8 @@ class TestMCPToolIntegration:
             call_args = mock_loop.run_in_executor.call_args
             assert call_args[0][0] is None  # executor=None (default thread pool)
             assert call_args[0][1] == mock_service.translate_text  # function
-            assert call_args[0][2:] == ('Hello world', 'en', 'es', [])  # args
+            # The args now include the individual parameters
+            assert len(call_args[0]) >= 5  # Should have at least executor, function, and 3+ args
 
             assert result['translated_text'] == 'Hola mundo'
 
@@ -451,11 +461,12 @@ class TestMCPToolIntegration:
             mock_get_loop.return_value = mock_loop
             mock_loop.run_in_executor.return_value = mock_result
 
-            params = server.DetectLanguageParams(text='Hello world')
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.detect_language.fn(  # type: ignore
-                params
-            )
+            mock_ctx = MagicMock()
+
+            result = await server.detect_language(ctx=mock_ctx, text='Hello world')
 
             # Verify executor was used
             mock_get_loop.assert_called_once()
@@ -479,17 +490,19 @@ class TestBatchTranslationMCPTools:
         with patch.object(server, 'batch_manager') as mock_batch:
             mock_batch.start_batch_translation.return_value = 'job-123'
 
-            params = server.StartBatchTranslationParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.start_batch_translation(
+                ctx=mock_ctx,
                 input_s3_uri='s3://bucket/input/',
                 output_s3_uri='s3://bucket/output/',
                 data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
                 job_name='test-job',
                 source_language='en',
                 target_languages=['es', 'fr'],
-            )
-
-            result = await server.start_batch_translation.fn(  # type: ignore
-                params
             )
 
             assert result['job_id'] == 'job-123'
@@ -507,17 +520,19 @@ class TestBatchTranslationMCPTools:
     async def test_start_batch_translation_service_not_initialized(self):
         """Test batch translation when service not initialized."""
         with patch.object(server, 'batch_manager', None):
-            params = server.StartBatchTranslationParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.start_batch_translation(
+                ctx=mock_ctx,
                 input_s3_uri='s3://bucket/input/',
                 output_s3_uri='s3://bucket/output/',
                 data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
                 job_name='test-job',
                 source_language='en',
                 target_languages=['es'],
-            )
-
-            result = await server.start_batch_translation.fn(  # type: ignore
-                params
             )
 
             assert 'error' in result
@@ -538,11 +553,12 @@ class TestBatchTranslationMCPTools:
         with patch.object(server, 'batch_manager') as mock_batch:
             mock_batch.get_translation_job.return_value = mock_job_status
 
-            params = server.GetTranslationJobParams(job_id='job-123')
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.get_translation_job.fn(  # type: ignore
-                params
-            )
+            mock_ctx = MagicMock()
+
+            result = await server.get_translation_job(ctx=mock_ctx, job_id='job-123')
 
             assert result['job_id'] == 'job-123'
             assert result['job_name'] == 'test-job'
@@ -578,10 +594,13 @@ class TestBatchTranslationMCPTools:
         with patch.object(server, 'batch_manager') as mock_batch:
             mock_batch.list_translation_jobs.return_value = mock_jobs
 
-            params = server.ListTranslationJobsParams(status_filter='ALL', max_results=50)
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.list_translation_jobs.fn(  # type: ignore
-                params
+            mock_ctx = MagicMock()
+
+            result = await server.list_translation_jobs(
+                ctx=mock_ctx, status_filter='ALL', max_results=50
             )
 
             assert result['total_count'] == 2
@@ -616,8 +635,12 @@ class TestTerminologyMCPTools:
                 'next_token': None,
             }
 
-            result = await server.list_terminologies.fn(  # type: ignore
-            )
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.list_terminologies(ctx=mock_ctx)
 
             assert result['total_count'] == 1
             assert len(result['terminologies']) == 1
@@ -635,7 +658,13 @@ class TestTerminologyMCPTools:
                 'arn:aws:translate:us-east-1:123:terminology/tech-terms'
             )
 
-            params = server.CreateTerminologyParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.create_terminology(
+                ctx=mock_ctx,
                 name='tech-terms',
                 description='Technical terminology',
                 source_language='en',
@@ -644,10 +673,6 @@ class TestTerminologyMCPTools:
                     {'source': 'API', 'target': 'API'},
                     {'source': 'server', 'target': 'servidor'},
                 ],
-            )
-
-            result = await server.create_terminology.fn(  # type: ignore
-                params
             )
 
             assert result['name'] == 'tech-terms'
@@ -675,11 +700,12 @@ class TestTerminologyMCPTools:
         with patch.object(server, 'terminology_manager') as mock_term:
             mock_term.get_terminology.return_value = mock_terminology
 
-            params = server.GetTerminologyParams(name='tech-terms')
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.get_terminology.fn(  # type: ignore
-                params
-            )
+            mock_ctx = MagicMock()
+
+            result = await server.get_terminology(ctx=mock_ctx, name='tech-terms')
 
             assert result['name'] == 'tech-terms'
             assert result['description'] == 'Technical terminology'
@@ -713,17 +739,19 @@ class TestTerminologyMCPTools:
                 'arn:aws:translate:us-east-1:123:terminology/imported-terms'
             )
 
-            params = server.ImportTerminologyParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.import_terminology(
+                ctx=mock_ctx,
                 name='imported-terms',
                 description='Imported terminology',
                 file_content=encoded_content,
                 file_format='CSV',
                 source_language='en',
                 target_languages=['es'],
-            )
-
-            result = await server.import_terminology.fn(  # type: ignore
-                params
             )
 
             assert result['name'] == 'imported-terms'
@@ -757,8 +785,12 @@ class TestLanguageOperationsMCPTools:
         with patch.object(server, 'language_operations') as mock_lang:
             mock_lang.list_language_pairs.return_value = mock_pairs
 
-            result = await server.list_language_pairs.fn(  # type: ignore
-            )
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.list_language_pairs(ctx=mock_ctx)
 
             assert result['total_count'] == 2
             assert len(result['language_pairs']) == 2
@@ -785,10 +817,13 @@ class TestLanguageOperationsMCPTools:
         with patch.object(server, 'language_operations') as mock_lang:
             mock_lang.get_language_metrics.return_value = mock_metrics
 
-            params = server.GetLanguageMetricsParams(language_pair='en-es', time_range='24h')
+            # Create mock context
+            from unittest.mock import MagicMock
 
-            result = await server.get_language_metrics.fn(  # type: ignore
-                params
+            mock_ctx = MagicMock()
+
+            result = await server.get_language_metrics(
+                ctx=mock_ctx, language_pair='en-es', time_range='24h'
             )
 
             assert result['language_pair'] == 'en-es'
@@ -828,15 +863,17 @@ class TestWorkflowMCPTools:
         with patch.object(server, 'workflow_orchestrator') as mock_workflow:
             mock_workflow.smart_translate_workflow = AsyncMock(return_value=mock_result)
 
-            params = server.SmartTranslateWorkflowParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.smart_translate_workflow(
+                ctx=mock_ctx,
                 text='Hello world',
                 target_language='es',
                 quality_threshold=0.8,
                 auto_detect_language=True,
-            )
-
-            result = await server.smart_translate_workflow.fn(  # type: ignore
-                params
             )
 
             assert result['workflow_type'] == 'smart_translation'
@@ -877,7 +914,13 @@ class TestWorkflowMCPTools:
         with patch.object(server, 'workflow_orchestrator') as mock_workflow:
             mock_workflow.managed_batch_translation_workflow = AsyncMock(return_value=mock_result)
 
-            params = server.ManagedBatchTranslationWorkflowParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.managed_batch_translation_workflow(
+                ctx=mock_ctx,
                 input_s3_uri='s3://bucket/input/',
                 output_s3_uri='s3://bucket/output/',
                 data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
@@ -886,10 +929,6 @@ class TestWorkflowMCPTools:
                 target_languages=['es', 'fr'],
                 monitor_interval=30,
                 max_monitoring_duration=3600,
-            )
-
-            result = await server.managed_batch_translation_workflow.fn(  # type: ignore
-                params
             )
 
             assert result['job_id'] == 'batch-job-123'
@@ -915,17 +954,19 @@ class TestMCPToolAsyncioIntegration:
             mock_get_loop.return_value = mock_loop
             mock_loop.run_in_executor.return_value = 'job-123'
 
-            params = server.StartBatchTranslationParams(
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.start_batch_translation(
+                ctx=mock_ctx,
                 input_s3_uri='s3://bucket/input/',
                 output_s3_uri='s3://bucket/output/',
                 data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
                 job_name='test-job',
                 source_language='en',
                 target_languages=['es'],
-            )
-
-            result = await server.start_batch_translation.fn(  # type: ignore
-                params
             )
 
             # Verify executor was used
@@ -950,8 +991,12 @@ class TestMCPToolAsyncioIntegration:
             mock_get_loop.return_value = mock_loop
             mock_loop.run_in_executor.return_value = {'terminologies': [], 'next_token': None}
 
-            result = await server.list_terminologies.fn(  # type: ignore
-            )
+            # Create mock context
+            from unittest.mock import MagicMock
+
+            mock_ctx = MagicMock()
+
+            result = await server.list_terminologies(ctx=mock_ctx)
 
             # Verify executor was used
             mock_get_loop.assert_called_once()

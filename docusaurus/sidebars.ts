@@ -42,6 +42,7 @@ const sidebars: SidebarsConfig = {
           type: 'category',
           label: 'Infrastructure & Deployment',
           items: [
+            'servers/aws-iac-mcp-server',
             'servers/ccapi-mcp-server',
             'servers/cdk-mcp-server',
             'servers/cfn-mcp-server',
@@ -67,6 +68,7 @@ const sidebars: SidebarsConfig = {
             'servers/aws-bedrock-custom-model-import-mcp-server',
             'servers/amazon-bedrock-agentcore-mcp-server',
             'servers/amazon-translate-mcp-server'
+            'servers/sagemaker-ai-mcp-server',
           ],
         },
         {

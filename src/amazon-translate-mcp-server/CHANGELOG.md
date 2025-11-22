@@ -43,7 +43,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Terminology manager with CSV/TMX import support
   - Language operations with metrics and validation
 - **Security and Compliance**:
-  - PII detection and masking capabilities
   - Content filtering and profanity detection
   - Audit logging for all translation operations
   - Secure file handling for terminology imports

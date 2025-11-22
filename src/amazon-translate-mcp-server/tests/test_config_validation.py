@@ -154,9 +154,7 @@ class TestPrintConfigurationSummary:
         config.aws_profile = 'test-profile'
         config.log_level = 'DEBUG'
         config.enable_translation_cache = True
-        config.enable_pii_detection = False
-        config.enable_profanity_filter = True
-        config.enable_content_filtering = False
+
         config.enable_audit_logging = True
         config.max_text_length = 10000
         config.max_file_size = 5 * 1024 * 1024  # 5MB
@@ -176,9 +174,7 @@ class TestPrintConfigurationSummary:
         assert 'AWS Profile: test-profile' in output
         assert 'Log Level: DEBUG' in output
         assert 'Translation Cache: Enabled' in output
-        assert 'PII Detection: Disabled' in output
-        assert 'Profanity Filter: Enabled' in output
-        assert 'Content Filtering: Disabled' in output
+
         assert 'Audit Logging: Enabled' in output
         assert 'Max Text Length: 10,000 characters' in output
         assert 'Max File Size: 5,242,880 bytes (5.0 MB)' in output

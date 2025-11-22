@@ -29,9 +29,6 @@ class TestServerConfigExtended:
             log_level='DEBUG',
             max_text_length=5000,
             batch_timeout=7200,
-            enable_pii_detection=True,
-            enable_profanity_filter=True,
-            enable_content_filtering=True,
             enable_audit_logging=True,
             enable_translation_cache=True,
             cache_ttl=7200,
@@ -46,8 +43,7 @@ class TestServerConfigExtended:
         assert config.log_level == 'DEBUG'
         assert config.max_text_length == 5000
         assert config.batch_timeout == 7200
-        assert config.enable_pii_detection is True
-        assert config.enable_profanity_filter is True
+
         assert config.cache_ttl == 7200
         assert config.max_file_size == 20 * 1024 * 1024
         assert '.docx' in config.allowed_file_extensions
@@ -168,9 +164,6 @@ class TestEnvironmentVariableLoading:
             'FASTMCP_LOG_LEVEL': 'DEBUG',
             'TRANSLATE_MAX_TEXT_LENGTH': '7500',
             'TRANSLATE_BATCH_TIMEOUT': '7200',
-            'ENABLE_PII_DETECTION': 'true',
-            'ENABLE_PROFANITY_FILTER': 'true',
-            'ENABLE_CONTENT_FILTERING': 'false',
             'ENABLE_AUDIT_LOGGING': 'true',
             'ENABLE_TRANSLATION_CACHE': 'false',
             'TRANSLATE_CACHE_TTL': '1800',
@@ -187,9 +180,7 @@ class TestEnvironmentVariableLoading:
             assert config.log_level == 'DEBUG'
             assert config.max_text_length == 7500
             assert config.batch_timeout == 7200
-            assert config.enable_pii_detection is True
-            assert config.enable_profanity_filter is True
-            assert config.enable_content_filtering is False
+
             assert config.enable_audit_logging is True
             assert config.enable_translation_cache is False
             assert config.cache_ttl == 1800
@@ -206,7 +197,7 @@ class TestEnvironmentVariableLoading:
             assert config.log_level == 'INFO'
             assert config.max_text_length == 10000
             assert config.batch_timeout == 3600
-            assert config.enable_pii_detection is False
+
             assert config.enable_audit_logging is True
             assert config.enable_translation_cache is True
             assert config.cache_ttl == 3600

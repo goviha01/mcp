@@ -36,7 +36,7 @@ from awslabs.amazon_translate_mcp_server.models import (
 )
 from botocore.exceptions import BotoCoreError, ClientError
 from datetime import datetime
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, patch
 
 
 class TestBatchJobManager:
@@ -641,3 +641,326 @@ class TestBatchJobManager:
 
         assert 'Unexpected error starting batch translation job' in str(exc_info.value)
         assert exc_info.value.details['error_type'] == 'RuntimeError'
+
+
+class TestBatchManagerErrorHandling:
+    """Test batch manager error handling scenarios."""
+
+    def test_start_batch_translation_validation_error(self):
+        """Test handling of validation errors during batch translation start."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+        from awslabs.amazon_translate_mcp_server.models import (
+            BatchInputConfig,
+            BatchOutputConfig,
+            JobConfig,
+        )
+        from botocore.exceptions import ClientError
+
+        mock_aws_client = MagicMock()
+        manager = BatchJobManager(aws_client_manager=mock_aws_client)
+
+        with patch.object(manager.aws_client_manager, 'get_translate_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+            # Mock validation error
+            mock_client.start_text_translation_job.side_effect = ClientError(
+                error_response={
+                    'Error': {'Code': 'ValidationException', 'Message': 'Invalid input parameters'}
+                },
+                operation_name='StartTextTranslationJob',
+            )
+
+            job_config = JobConfig(
+                job_name='test-job', source_language_code='en', target_language_codes=['es']
+            )
+
+            input_config = BatchInputConfig(
+                s3_uri='s3://test-bucket/input/',
+                content_type='text/plain',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+            )
+
+            output_config = BatchOutputConfig(
+                s3_uri='s3://test-bucket/output/',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+            )
+
+            with pytest.raises(Exception):  # ValidationError
+                manager.start_batch_translation(input_config, output_config, job_config)
+
+    def test_start_batch_translation_generic_error(self):
+        """Test handling of generic errors during batch translation start."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+        from awslabs.amazon_translate_mcp_server.models import (
+            BatchInputConfig,
+            BatchOutputConfig,
+            JobConfig,
+        )
+        from botocore.exceptions import ClientError
+
+        mock_aws_client = MagicMock()
+        manager = BatchJobManager(mock_aws_client)
+
+        with patch.object(manager.aws_client_manager, 'get_translate_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+            # Mock generic error
+            mock_client.start_text_translation_job.side_effect = ClientError(
+                error_response={
+                    'Error': {'Code': 'InternalServerError', 'Message': 'Internal server error'}
+                },
+                operation_name='StartTextTranslationJob',
+            )
+
+            job_config = JobConfig(
+                job_name='test-job', source_language_code='en', target_language_codes=['es']
+            )
+
+            input_config = BatchInputConfig(
+                s3_uri='s3://test-bucket/input/',
+                content_type='text/plain',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+            )
+
+            output_config = BatchOutputConfig(
+                s3_uri='s3://test-bucket/output/',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+            )
+
+            with pytest.raises(Exception):  # BatchJobError
+                manager.start_batch_translation(input_config, output_config, job_config)
+
+    def test_s3_uri_parsing_edge_cases(self):
+        """Test S3 URI parsing with various edge cases."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+
+        mock_aws_client = MagicMock()
+        manager = BatchJobManager(mock_aws_client)
+
+        # Test valid S3 URIs
+        bucket, key = manager._parse_s3_uri('s3://my-bucket/path/to/file.txt')
+        assert bucket == 'my-bucket'
+        assert key == 'path/to/file.txt'
+
+        bucket, key = manager._parse_s3_uri('s3://my-bucket/')
+        assert bucket == 'my-bucket'
+        assert key == ''
+
+        bucket, key = manager._parse_s3_uri('s3://my-bucket')
+        assert bucket == 'my-bucket'
+        assert key == ''
+
+        # Test invalid S3 URIs
+        with pytest.raises(Exception):  # ValidationError
+            manager._parse_s3_uri('invalid-uri')
+
+        with pytest.raises(Exception):  # ValidationError
+            manager._parse_s3_uri('http://example.com/file.txt')
+
+        with pytest.raises(Exception):  # ValidationError
+            manager._parse_s3_uri('')
+
+    def test_job_status_monitoring_edge_cases(self):
+        """Test job status monitoring with edge cases."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+        from botocore.exceptions import ClientError
+
+        mock_aws_client = MagicMock()
+        manager = BatchJobManager(mock_aws_client)
+
+        with patch.object(manager.aws_client_manager, 'get_translate_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+            # Test job not found
+            mock_client.describe_text_translation_job.side_effect = ClientError(
+                error_response={
+                    'Error': {'Code': 'ResourceNotFoundException', 'Message': 'Job not found'}
+                },
+                operation_name='DescribeTextTranslationJob',
+            )
+
+            with pytest.raises(Exception):  # BatchJobError
+                manager.get_translation_job('nonexistent-job')
+
+    def test_list_translation_jobs_with_filters(self):
+        """Test listing translation jobs with various filters."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+
+        mock_aws_client = MagicMock()
+        manager = BatchJobManager(mock_aws_client)
+
+        with patch.object(manager.aws_client_manager, 'get_translate_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+            # Mock successful response
+            mock_client.list_text_translation_jobs.return_value = {
+                'TextTranslationJobPropertiesList': [
+                    {
+                        'JobId': 'job-123',
+                        'JobName': 'test-job',
+                        'JobStatus': 'COMPLETED',
+                        'SourceLanguageCode': 'en',
+                        'TargetLanguageCodes': ['es'],
+                    }
+                ]
+            }
+
+            # Test with status filter
+            result = manager.list_translation_jobs(status_filter='COMPLETED')
+            assert len(result['jobs']) == 1
+            assert result['jobs'][0].job_id == 'job-123'
+
+            # Verify the filter was applied
+            mock_client.list_text_translation_jobs.assert_called()
+
+    def test_batch_job_configuration_validation(self):
+        """Test batch job configuration validation."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+        from awslabs.amazon_translate_mcp_server.models import JobConfig
+
+        mock_aws_client = MagicMock()
+        BatchJobManager(mock_aws_client)
+
+        # Test valid configuration
+        valid_config = JobConfig(
+            job_name='valid-job-name',
+            source_language_code='en',
+            target_language_codes=['es', 'fr'],
+        )
+
+        # Test that the config object is properly created
+        assert valid_config.job_name == 'valid-job-name'
+        assert valid_config.source_language_code == 'en'
+        assert valid_config.target_language_codes == ['es', 'fr']
+
+        # Test invalid job name (should raise validation error)
+        with pytest.raises(ValueError):  # job_name validation error
+            JobConfig(
+                job_name='',  # Empty name
+                source_language_code='en',
+                target_language_codes=['es'],
+            )
+
+    def test_batch_input_output_config_validation(self):
+        """Test batch input and output configuration validation."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+        from awslabs.amazon_translate_mcp_server.models import BatchInputConfig, BatchOutputConfig
+
+        mock_aws_client = MagicMock()
+        BatchJobManager(mock_aws_client)
+
+        # Test valid input config
+        valid_input = BatchInputConfig(
+            s3_uri='s3://valid-bucket/input/',
+            content_type='text/plain',
+            data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+        )
+
+        # Test that the config object is properly created
+        assert valid_input.s3_uri == 's3://valid-bucket/input/'
+
+        # Test valid output config
+        valid_output = BatchOutputConfig(
+            s3_uri='s3://valid-bucket/output/',
+            data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+        )
+
+        # Test that the output config object is properly created
+        assert valid_output.s3_uri == 's3://valid-bucket/output/'
+
+        # Test invalid input config (invalid S3 URI should raise validation error)
+        with pytest.raises(ValueError):  # s3_uri validation error
+            BatchInputConfig(
+                s3_uri='invalid-uri',
+                content_type='text/plain',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+            )
+
+    def test_job_progress_calculation(self):
+        """Test job progress calculation functionality."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+
+        mock_aws_client = MagicMock()
+        manager = BatchJobManager(mock_aws_client)
+
+        # Test progress calculation based on job status
+        job_details_submitted = {'JobStatus': 'SUBMITTED'}
+        progress = manager._calculate_progress(job_details_submitted)
+        assert progress == 0.0
+
+        job_details_in_progress = {'JobStatus': 'IN_PROGRESS'}
+        progress = manager._calculate_progress(job_details_in_progress)
+        assert progress == 50.0
+
+        job_details_completed = {'JobStatus': 'COMPLETED'}
+        progress = manager._calculate_progress(job_details_completed)
+        assert progress == 100.0
+
+        job_details_failed = {'JobStatus': 'FAILED'}
+        progress = manager._calculate_progress(job_details_failed)
+        assert progress == 0.0
+
+        job_details_unknown = {'JobStatus': 'UNKNOWN'}
+        progress = manager._calculate_progress(job_details_unknown)
+        assert progress is None
+
+
+class TestBatchManagerAdvancedFeatures:
+    """Test advanced batch manager features."""
+
+    def test_job_retry_mechanism(self):
+        """Test job retry mechanism for failed operations."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+        from botocore.exceptions import ClientError
+
+        mock_aws_client = MagicMock()
+        manager = BatchJobManager(mock_aws_client)
+
+        with patch.object(manager.aws_client_manager, 'get_translate_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+            # Mock temporary failure followed by success
+            mock_client.describe_text_translation_job.side_effect = [
+                ClientError(
+                    error_response={
+                        'Error': {'Code': 'ThrottlingException', 'Message': 'Rate exceeded'}
+                    },
+                    operation_name='DescribeTextTranslationJob',
+                ),
+                {
+                    'TextTranslationJobProperties': {
+                        'JobId': 'job-123',
+                        'JobName': 'test-job',
+                        'JobStatus': 'COMPLETED',
+                    }
+                },
+            ]
+
+            # Should raise BatchJobError on throttling
+            with pytest.raises(Exception):  # BatchJobError
+                manager.get_translation_job('job-123')
+
+    def test_batch_job_cleanup_operations(self):
+        """Test batch job cleanup operations."""
+        from awslabs.amazon_translate_mcp_server.batch_manager import BatchJobManager
+
+        mock_aws_client = MagicMock()
+        manager = BatchJobManager(mock_aws_client)
+
+        with patch.object(manager.aws_client_manager, 'get_translate_client') as mock_get_client:
+            mock_client = MagicMock()
+            mock_get_client.return_value = mock_client
+            # Mock successful cleanup
+            mock_client.stop_text_translation_job.return_value = {
+                'TextTranslationJobProperties': {
+                    'JobId': 'job-123',
+                    'JobName': 'test-job',
+                    'JobStatus': 'STOP_REQUESTED',
+                }
+            }
+
+            result = manager.stop_translation_job('job-123')
+            assert result.status == 'STOP_REQUESTED'
+
+            # Verify the stop operation was called
+            mock_client.stop_text_translation_job.assert_called_with(JobId='job-123')

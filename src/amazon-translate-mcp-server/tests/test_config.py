@@ -16,8 +16,7 @@ from awslabs.amazon_translate_mcp_server.config import (
     setup_logging,
     validate_aws_config,
 )
-from awslabs.amazon_translate_mcp_server.security import SecurityConfig
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 
 class TestServerConfig:
@@ -32,8 +31,7 @@ class TestServerConfig:
         assert config.log_level == 'INFO'
         assert config.max_text_length == 10000
         assert config.batch_timeout == 3600
-        assert config.enable_pii_detection is False
-        assert config.enable_profanity_filter is False
+
         assert config.enable_audit_logging is True
         assert config.cache_ttl == 3600
         assert config.max_file_size == 10 * 1024 * 1024
@@ -46,8 +44,6 @@ class TestServerConfig:
             aws_region='us-west-2',
             log_level='DEBUG',
             max_text_length=5000,
-            enable_pii_detection=True,
-            enable_profanity_filter=True,
             cache_ttl=1800,
             blocked_patterns=['secret', 'confidential'],
         )
@@ -56,8 +52,7 @@ class TestServerConfig:
         assert config.aws_region == 'us-west-2'
         assert config.log_level == 'DEBUG'
         assert config.max_text_length == 5000
-        assert config.enable_pii_detection is True
-        assert config.enable_profanity_filter is True
+
         assert config.cache_ttl == 1800
         assert 'secret' in config.blocked_patterns
 
@@ -78,27 +73,6 @@ class TestServerConfig:
         with pytest.raises(ValueError, match='max_file_size must be positive'):
             ServerConfig(max_file_size=0)
 
-    def test_to_security_config(self):
-        """Test conversion to SecurityConfig."""
-        config = ServerConfig(
-            enable_pii_detection=True,
-            enable_profanity_filter=True,
-            enable_content_filtering=True,
-            max_text_length=5000,
-            max_file_size=1024,
-            blocked_patterns=['test'],
-        )
-
-        security_config = config.to_security_config()
-
-        assert isinstance(security_config, SecurityConfig)
-        assert security_config.enable_pii_detection is True
-        assert security_config.enable_profanity_filter is True
-        assert security_config.enable_content_filtering is True
-        assert security_config.max_text_length == 5000
-        assert security_config.max_file_size == 1024
-        assert 'test' in security_config.blocked_patterns
-
 
 class TestConfigLoading:
     """Test configuration loading from environment."""
@@ -112,7 +86,7 @@ class TestConfigLoading:
             assert config.aws_region is None
             assert config.log_level == 'INFO'
             assert config.max_text_length == 10000
-            assert config.enable_pii_detection is False
+
             assert config.enable_audit_logging is True
 
     def test_load_config_from_env_vars(self):
@@ -123,9 +97,6 @@ class TestConfigLoading:
             'FASTMCP_LOG_LEVEL': 'debug',
             'TRANSLATE_MAX_TEXT_LENGTH': '5000',
             'TRANSLATE_BATCH_TIMEOUT': '1800',
-            'ENABLE_PII_DETECTION': 'true',
-            'ENABLE_PROFANITY_FILTER': '1',
-            'ENABLE_CONTENT_FILTERING': 'yes',
             'ENABLE_AUDIT_LOGGING': 'false',
             'ENABLE_TRANSLATION_CACHE': 'no',
             'TRANSLATE_CACHE_TTL': '7200',
@@ -142,9 +113,7 @@ class TestConfigLoading:
             assert config.log_level == 'DEBUG'
             assert config.max_text_length == 5000
             assert config.batch_timeout == 1800
-            assert config.enable_pii_detection is True
-            assert config.enable_profanity_filter is True
-            assert config.enable_content_filtering is True
+
             assert config.enable_audit_logging is False
             assert config.enable_translation_cache is False
             assert config.cache_ttl == 7200
@@ -183,14 +152,14 @@ class TestConfigLoading:
         false_values = ['false', '0', 'no', 'off', 'FALSE', 'No', 'OFF', '']
 
         for true_val in true_values:
-            with patch.dict(os.environ, {'ENABLE_PII_DETECTION': true_val}, clear=True):
+            with patch.dict(os.environ, {'ENABLE_AUDIT_LOGGING': true_val}, clear=True):
                 config = load_config_from_env()
-                assert config.enable_pii_detection is True, f'Failed for value: {true_val}'
+                assert config.enable_audit_logging is True, f'Failed for value: {true_val}'
 
         for false_val in false_values:
-            with patch.dict(os.environ, {'ENABLE_PII_DETECTION': false_val}, clear=True):
+            with patch.dict(os.environ, {'ENABLE_AUDIT_LOGGING': false_val}, clear=True):
                 config = load_config_from_env()
-                assert config.enable_pii_detection is False, f'Failed for value: {false_val}'
+                assert config.enable_audit_logging is False, f'Failed for value: {false_val}'
 
 
 class TestLoggingSetup:
@@ -423,7 +392,6 @@ class TestConfigIntegration:
             'AWS_PROFILE': 'production',
             'AWS_REGION': 'us-west-2',
             'FASTMCP_LOG_LEVEL': 'INFO',
-            'ENABLE_PII_DETECTION': 'true',
             'ENABLE_AUDIT_LOGGING': 'true',
             'TRANSLATE_MAX_TEXT_LENGTH': '8000',
             'TRANSLATE_BLOCKED_PATTERNS': 'secret,confidential',
@@ -443,16 +411,9 @@ class TestConfigIntegration:
                     assert config.aws_profile == 'production'
                     assert config.aws_region == 'us-west-2'
                     assert config.log_level == 'INFO'
-                    assert config.enable_pii_detection is True
                     assert config.enable_audit_logging is True
                     assert config.max_text_length == 8000
                     assert 'secret' in config.blocked_patterns
-
-                    # Verify security config conversion
-                    security_config = config.to_security_config()
-                    assert security_config.enable_pii_detection is True
-                    assert security_config.max_text_length == 8000
-                    assert 'confidential' in security_config.blocked_patterns
 
     def test_config_error_handling(self):
         """Test configuration error handling."""
@@ -464,11 +425,8 @@ class TestConfigIntegration:
                 get_config()
 
     def test_config_with_security_features(self):
-        """Test configuration with all security features enabled."""
+        """Test configuration with security features enabled."""
         env_vars = {
-            'ENABLE_PII_DETECTION': 'true',
-            'ENABLE_PROFANITY_FILTER': 'true',
-            'ENABLE_CONTENT_FILTERING': 'true',
             'ENABLE_AUDIT_LOGGING': 'true',
             'TRANSLATE_BLOCKED_PATTERNS': 'secret,confidential,private,internal',
         }
@@ -483,15 +441,249 @@ class TestConfigIntegration:
 
                     config = get_config()
 
-                    assert config.enable_pii_detection is True
-                    assert config.enable_profanity_filter is True
-                    assert config.enable_content_filtering is True
                     assert config.enable_audit_logging is True
                     assert len(config.blocked_patterns) == 4
 
-                    # Test security config conversion
-                    security_config = config.to_security_config()
-                    assert security_config.enable_pii_detection is True
-                    assert security_config.enable_profanity_filter is True
-                    assert security_config.enable_content_filtering is True
-                    assert security_config.enable_audit_logging is True
+
+class TestConfigAdvancedFeatures:
+    """Test advanced configuration features and edge cases."""
+
+    def test_config_validation_comprehensive(self):
+        """Test comprehensive configuration validation."""
+        from awslabs.amazon_translate_mcp_server.config import ServerConfig, validate_aws_config
+
+        # Test config with all valid parameters
+        config = ServerConfig(
+            aws_region='us-west-2',
+            aws_profile='custom-profile',
+            max_text_length=10000,
+            max_file_size=5242880,  # 5MB
+            cache_ttl=7200,
+            enable_translation_cache=True,
+            blocked_patterns=['pattern1', 'pattern2'],
+        )
+
+        # Should not raise exception
+        validate_aws_config(config)
+
+        # Test config with edge case values
+        edge_config = ServerConfig(
+            max_text_length=1,  # Minimum
+            max_file_size=1,  # Minimum
+            cache_ttl=1,  # Minimum
+        )
+
+        validate_aws_config(edge_config)
+
+    def test_environment_variable_loading(self):
+        """Test loading configuration from environment variables."""
+        import os
+        from awslabs.amazon_translate_mcp_server.config import load_config_from_env
+
+        # Test with custom environment variables
+        env_vars = {
+            'AWS_REGION': 'eu-west-1',
+            'AWS_PROFILE': 'test-profile',
+            'TRANSLATE_MAX_TEXT_LENGTH': '15000',
+            'TRANSLATE_MAX_FILE_SIZE': '10485760',
+            'TRANSLATE_CACHE_TTL': '5400',
+            'TRANSLATE_ENABLE_CACHE': 'true',
+            'TRANSLATE_BLOCKED_PATTERNS': 'pattern1,pattern2,pattern3',
+        }
+
+        with patch.dict(os.environ, env_vars):
+            config = load_config_from_env()
+
+            assert config.aws_region == 'eu-west-1'
+            assert config.aws_profile == 'test-profile'
+            assert config.max_text_length == 15000
+            assert config.max_file_size == 10485760
+            assert config.cache_ttl == 5400
+            assert config.enable_translation_cache is True
+            assert 'pattern1' in config.blocked_patterns
+            assert 'pattern2' in config.blocked_patterns
+            assert 'pattern3' in config.blocked_patterns
+
+    def test_config_validation_edge_cases(self):
+        """Test configuration validation with edge cases."""
+        from awslabs.amazon_translate_mcp_server.config import ServerConfig, validate_aws_config
+
+        # Test with invalid region (should not raise exception, just log warning)
+        invalid_region_config = ServerConfig(aws_region='invalid-region')
+        result = validate_aws_config(invalid_region_config)
+        assert result is True  # Function returns True even for invalid regions
+
+        # Test with negative values (ServerConfig validation should handle this)
+        with pytest.raises(ValueError):  # Should be caught by ServerConfig.__post_init__
+            ServerConfig(max_text_length=-1, max_file_size=-1, cache_ttl=-1)
+
+    def test_config_serialization(self):
+        """Test configuration serialization and deserialization."""
+        from awslabs.amazon_translate_mcp_server.config import ServerConfig
+
+        config = ServerConfig(
+            aws_region='us-east-1',
+            aws_profile='test-profile',
+            max_text_length=5000,
+            enable_translation_cache=True,
+            blocked_patterns=['test-pattern'],
+        )
+
+        # Test dict conversion
+        from dataclasses import asdict
+
+        config_dict = asdict(config)
+        assert config_dict['aws_region'] == 'us-east-1'
+        assert config_dict['aws_profile'] == 'test-profile'
+        assert config_dict['max_text_length'] == 5000
+
+        # Test reconstruction from dict
+        new_config = ServerConfig(**config_dict)
+        assert new_config.aws_region == config.aws_region
+        assert new_config.aws_profile == config.aws_profile
+        assert new_config.max_text_length == config.max_text_length
+
+    def test_config_defaults_and_overrides(self):
+        """Test configuration defaults and override behavior."""
+        from awslabs.amazon_translate_mcp_server.config import ServerConfig
+
+        # Test with minimal config (should use defaults)
+        minimal_config = ServerConfig()
+
+        assert minimal_config.aws_region is None  # Default
+        assert minimal_config.max_text_length == 10000  # Default
+        assert minimal_config.enable_translation_cache is True  # Default
+
+        # Test override behavior
+        override_config = ServerConfig(aws_region='eu-west-1', max_text_length=10000)
+
+        assert override_config.aws_region == 'eu-west-1'  # Overridden
+        assert override_config.max_text_length == 10000  # Overridden
+        assert override_config.enable_translation_cache is True  # Still default
+
+    def test_blocked_patterns_processing(self):
+        """Test blocked patterns configuration."""
+        from awslabs.amazon_translate_mcp_server.config import ServerConfig
+
+        # Test configuration with blocked patterns
+        config = ServerConfig(blocked_patterns=['pattern1', 'pattern2', 'pattern3'])
+
+        assert isinstance(config.blocked_patterns, list)
+        assert len(config.blocked_patterns) == 3
+        assert 'pattern1' in config.blocked_patterns
+        assert 'pattern2' in config.blocked_patterns
+        assert 'pattern3' in config.blocked_patterns
+
+        # Test empty patterns
+        empty_config = ServerConfig(blocked_patterns=[])
+        assert isinstance(empty_config.blocked_patterns, list)
+        assert len(empty_config.blocked_patterns) == 0
+
+        # Test default (no patterns)
+        default_config = ServerConfig()
+        assert default_config.blocked_patterns == []
+
+    def test_startup_configuration_validation(self):
+        """Test startup configuration validation."""
+        from awslabs.amazon_translate_mcp_server.config import validate_startup_configuration
+
+        with patch('awslabs.amazon_translate_mcp_server.config.load_config_from_env') as mock_load:
+            with patch(
+                'awslabs.amazon_translate_mcp_server.config.validate_aws_config'
+            ) as mock_validate:
+                with patch('boto3.Session') as mock_session:
+                    # Mock successful configuration
+                    mock_config = MagicMock()
+                    mock_config.aws_region = 'us-east-1'
+                    mock_config.aws_profile = None
+                    mock_config.max_file_size = 10 * 1024 * 1024  # 10MB
+                    mock_config.max_text_length = 5000
+
+                    mock_config.enable_translation_cache = True
+                    mock_config.cache_ttl = 3600
+                    mock_load.return_value = mock_config
+
+                    mock_validate.return_value = None
+                    mock_session.return_value = MagicMock()
+
+                    # Should not raise exception
+                    validate_startup_configuration()
+
+                    # Verify all validation steps were called
+                    mock_load.assert_called_once()
+                    mock_validate.assert_called_once_with(mock_config)
+                    mock_session.assert_called_once()
+
+
+class TestConfigErrorHandling:
+    """Test configuration error handling scenarios."""
+
+    def test_invalid_environment_values(self):
+        """Test handling of invalid environment variable values."""
+        import os
+        from awslabs.amazon_translate_mcp_server.config import load_config_from_env
+
+        # Test with invalid numeric values
+        invalid_env = {
+            'TRANSLATE_MAX_TEXT_LENGTH': 'not-a-number',
+            'TRANSLATE_MAX_FILE_SIZE': 'invalid',
+            'TRANSLATE_CACHE_TTL': 'bad-value',
+        }
+
+        with patch.dict(os.environ, invalid_env):
+            # Should use defaults when invalid values are provided
+            config = load_config_from_env()
+
+            # Should fall back to defaults
+            assert config.max_text_length == 10000  # Default
+            assert config.max_file_size == 10485760  # Default (10MB)
+            assert config.cache_ttl == 3600  # Default
+
+    def test_missing_required_configuration(self):
+        """Test handling of missing required configuration."""
+        from awslabs.amazon_translate_mcp_server.config import validate_startup_configuration
+
+        with patch('awslabs.amazon_translate_mcp_server.config.load_config_from_env') as mock_load:
+            # Mock missing configuration
+            mock_load.side_effect = Exception('Configuration not found')
+
+            with pytest.raises(Exception):  # RuntimeError
+                validate_startup_configuration()
+
+    def test_aws_session_creation_failure(self):
+        """Test handling of AWS session creation failure."""
+        from awslabs.amazon_translate_mcp_server.config import validate_startup_configuration
+
+        with patch('awslabs.amazon_translate_mcp_server.config.load_config_from_env') as mock_load:
+            with patch(
+                'awslabs.amazon_translate_mcp_server.config.validate_aws_config'
+            ) as mock_validate:
+                with patch('boto3.Session') as mock_session:
+                    # Mock successful config loading
+                    mock_config = MagicMock()
+                    mock_load.return_value = mock_config
+                    mock_validate.return_value = None
+
+                    # Mock session creation failure
+                    mock_session.side_effect = Exception('Failed to create AWS session')
+
+                    with pytest.raises(Exception):  # RuntimeError
+                        validate_startup_configuration()
+
+    def test_config_validation_failure(self):
+        """Test handling of configuration validation failure."""
+        from awslabs.amazon_translate_mcp_server.config import validate_startup_configuration
+
+        with patch('awslabs.amazon_translate_mcp_server.config.load_config_from_env') as mock_load:
+            with patch(
+                'awslabs.amazon_translate_mcp_server.config.validate_aws_config'
+            ) as mock_validate:
+                # Mock successful config loading
+                mock_config = MagicMock()
+                mock_load.return_value = mock_config
+
+                # Mock validation failure
+                mock_validate.side_effect = Exception('Invalid configuration')
+
+                with pytest.raises(Exception):  # RuntimeError
+                    validate_startup_configuration()

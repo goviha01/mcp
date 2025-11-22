@@ -399,11 +399,7 @@ class TimeoutError(TranslateException):
 
 
 class SecurityError(TranslateException):
-    """Security-related errors.
-
-    Raised when security violations are detected, including
-    PII detection, content filtering, or file security issues.
-    """
+    """Security-related errors."""
 
     def __init__(
         self,

@@ -20,7 +20,6 @@ and server configuration with validation and defaults.
 
 import logging
 import os
-from .security import SecurityConfig
 from dataclasses import dataclass, field
 from typing import List, Optional, Set
 
@@ -41,9 +40,6 @@ class ServerConfig:
     batch_timeout: int = 3600
 
     # Feature Flags
-    enable_pii_detection: bool = False
-    enable_profanity_filter: bool = False
-    enable_content_filtering: bool = False
     enable_audit_logging: bool = True
     enable_translation_cache: bool = True
 
@@ -73,19 +69,6 @@ class ServerConfig:
 
         if self.max_file_size <= 0:
             raise ValueError('max_file_size must be positive')
-
-    def to_security_config(self) -> SecurityConfig:
-        """Convert to SecurityConfig for security module."""
-        return SecurityConfig(
-            enable_pii_detection=self.enable_pii_detection,
-            enable_profanity_filter=self.enable_profanity_filter,
-            enable_content_filtering=self.enable_content_filtering,
-            enable_audit_logging=self.enable_audit_logging,
-            max_text_length=self.max_text_length,
-            max_file_size=self.max_file_size,
-            allowed_file_extensions=self.allowed_file_extensions,
-            blocked_patterns=self.blocked_patterns,
-        )
 
 
 def load_config_from_env() -> ServerConfig:
@@ -130,9 +113,6 @@ def load_config_from_env() -> ServerConfig:
         max_text_length=parse_int(os.getenv('TRANSLATE_MAX_TEXT_LENGTH'), 10000),
         batch_timeout=parse_int(os.getenv('TRANSLATE_BATCH_TIMEOUT'), 3600),
         # Feature Flags
-        enable_pii_detection=parse_bool(os.getenv('ENABLE_PII_DETECTION')),
-        enable_profanity_filter=parse_bool(os.getenv('ENABLE_PROFANITY_FILTER')),
-        enable_content_filtering=parse_bool(os.getenv('ENABLE_CONTENT_FILTERING')),
         enable_audit_logging=parse_bool(os.getenv('ENABLE_AUDIT_LOGGING'), True),
         enable_translation_cache=parse_bool(os.getenv('ENABLE_TRANSLATION_CACHE'), True),
         # Cache Configuration
@@ -180,11 +160,7 @@ def setup_logging(config: ServerConfig):
 
     logger = logging.getLogger(__name__)
     logger.info(f'Logging configured with level: {config.log_level}')
-    logger.info(
-        f'Security features - PII: {config.enable_pii_detection}, '
-        f'Profanity: {config.enable_profanity_filter}, '
-        f'Audit: {config.enable_audit_logging}'
-    )
+    logger.info(f'Security features - Audit: {config.enable_audit_logging}')
 
 
 def validate_aws_config(config: ServerConfig) -> bool:
@@ -295,13 +271,8 @@ def validate_startup_configuration() -> ServerConfig:
             logger.warning(f'AWS connectivity check failed: {e}')
             logger.warning('Server will start but AWS operations may fail')
 
-        # Validate security configuration
-        security_config = config.to_security_config()
-        logger.info(
-            f'Security configuration: PII detection={security_config.enable_pii_detection}, '
-            f'Profanity filter={security_config.enable_profanity_filter}, '
-            f'Content filtering={security_config.enable_content_filtering}'
-        )
+        # Log security configuration
+        logger.info('Security configuration: Basic security features enabled')
 
         # Validate file handling configuration
         if config.max_file_size > 100 * 1024 * 1024:  # 100MB
@@ -342,9 +313,6 @@ def print_configuration_summary(config: ServerConfig):
 
     print('\nFeature Flags:')
     print(f'  Translation Cache: {"Enabled" if config.enable_translation_cache else "Disabled"}')
-    print(f'  PII Detection: {"Enabled" if config.enable_pii_detection else "Disabled"}')
-    print(f'  Profanity Filter: {"Enabled" if config.enable_profanity_filter else "Disabled"}')
-    print(f'  Content Filtering: {"Enabled" if config.enable_content_filtering else "Disabled"}')
     print(f'  Audit Logging: {"Enabled" if config.enable_audit_logging else "Disabled"}')
 
     print('\nLimits:')

@@ -29,9 +29,7 @@ class TestServerConfigComprehensive:
         assert config.log_level == 'INFO'
         assert config.max_text_length == 10000
         assert config.batch_timeout == 3600
-        assert config.enable_pii_detection is False
-        assert config.enable_profanity_filter is False
-        assert config.enable_content_filtering is False
+
         assert config.enable_audit_logging is True
         assert config.enable_translation_cache is True
         assert config.cache_ttl == 3600
@@ -49,9 +47,6 @@ class TestServerConfigComprehensive:
             log_level='DEBUG',
             max_text_length=5000,
             batch_timeout=1800,
-            enable_pii_detection=True,
-            enable_profanity_filter=True,
-            enable_content_filtering=True,
             enable_audit_logging=False,
             enable_translation_cache=False,
             cache_ttl=7200,
@@ -69,9 +64,7 @@ class TestServerConfigComprehensive:
         assert config.log_level == 'DEBUG'
         assert config.max_text_length == 5000
         assert config.batch_timeout == 1800
-        assert config.enable_pii_detection is True
-        assert config.enable_profanity_filter is True
-        assert config.enable_content_filtering is True
+
         assert config.enable_audit_logging is False
         assert config.enable_translation_cache is False
         assert config.cache_ttl == 7200
@@ -202,17 +195,13 @@ class TestLoadConfigFromEnv:
     def test_load_config_from_env_monitoring_settings(self):
         """Test loading monitoring settings from environment."""
         env_vars = {
-            'ENABLE_PII_DETECTION': 'false',
-            'ENABLE_PROFANITY_FILTER': 'true',
-            'ENABLE_CONTENT_FILTERING': 'false',
+            'ENABLE_AUDIT_LOGGING': 'true',
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
             config = load_config_from_env()
 
-            assert config.enable_pii_detection is False
-            assert config.enable_profanity_filter is True
-            assert config.enable_content_filtering is False
+            assert config.enable_audit_logging is True
 
     def test_load_config_from_env_file_settings(self):
         """Test loading file settings from environment."""

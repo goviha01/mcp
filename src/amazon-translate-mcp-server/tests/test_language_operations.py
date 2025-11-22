@@ -25,7 +25,7 @@ from awslabs.amazon_translate_mcp_server.models import (
 )
 from botocore.exceptions import BotoCoreError, ClientError
 from datetime import datetime, timedelta
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock, patch
 
 
 class TestLanguageOperations:
@@ -450,3 +450,366 @@ class TestLanguageOperations:
         assert 'error_rate' in result
         assert result['translation_count'] == 0  # Placeholder value
         assert result['character_count'] == 0  # Placeholder value
+
+
+class TestLanguageOperationsAdvancedFeatures:
+    """Test advanced language operations features and edge cases."""
+
+    def test_language_operations_initialization_edge_cases(self):
+        """Test language operations initialization with edge cases."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        # Test initialization with custom AWS client manager
+        with patch(
+            'awslabs.amazon_translate_mcp_server.language_operations.AWSClientManager'
+        ) as mock_aws:
+            mock_aws_instance = MagicMock()
+            mock_aws.return_value = mock_aws_instance
+
+            lang_ops = LanguageOperations(aws_client_manager=mock_aws_instance)
+            assert lang_ops.aws_client_manager == mock_aws_instance
+
+    def test_supported_formats_comprehensive(self):
+        """Test comprehensive supported formats functionality."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        # Test getting supported formats
+        formats = lang_ops.get_supported_formats()
+
+        assert isinstance(formats, list)
+        assert len(formats) > 0
+
+        # Should include common formats
+        assert 'text/plain' in formats
+        assert 'text/html' in formats
+
+        # Test format validation
+        for fmt in formats:
+            assert isinstance(fmt, str)
+            assert len(fmt) > 0
+            assert '/' in fmt  # Should be MIME type format
+
+    def test_language_pair_validation_comprehensive(self):
+        """Test comprehensive language pair validation."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        # Mock the list_language_pairs method directly
+        from awslabs.amazon_translate_mcp_server.models import LanguagePair
+
+        mock_pairs = [
+            LanguagePair(
+                source_language='en', target_language='es', supported_formats=['text/plain']
+            ),
+            LanguagePair(
+                source_language='es', target_language='fr', supported_formats=['text/plain']
+            ),
+            LanguagePair(
+                source_language='auto', target_language='es', supported_formats=['text/plain']
+            ),
+        ]
+
+        with patch.object(lang_ops, 'list_language_pairs', return_value=mock_pairs):
+            # Test valid language pairs
+            assert lang_ops.validate_language_pair('en', 'es') is True
+            assert lang_ops.validate_language_pair('es', 'fr') is True
+
+            # Test auto-detect source
+            assert lang_ops.validate_language_pair('auto', 'es') is True
+
+            # Test invalid language pairs (should return False)
+            assert lang_ops.validate_language_pair('invalid', 'es') is False
+            assert lang_ops.validate_language_pair('en', 'invalid') is False
+
+            # Test same source and target (should raise ValidationError)
+            with pytest.raises(ValidationError):
+                lang_ops.validate_language_pair('en', 'en')
+
+    def test_language_name_lookup_edge_cases(self):
+        """Test language name lookup with edge cases."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        # Mock the language cache directly
+        lang_ops._language_cache = {
+            'languages': [
+                {'LanguageCode': 'en', 'LanguageName': 'English'},
+                {'LanguageCode': 'es', 'LanguageName': 'Spanish'},
+                {'LanguageCode': 'zh-cn', 'LanguageName': 'Chinese (Simplified)'},
+            ],
+            'timestamp': datetime.now(),
+        }
+
+        with patch.object(lang_ops, '_is_cache_valid', return_value=True):
+            # Test valid language codes
+            assert lang_ops.get_language_name('en') == 'English'
+            assert lang_ops.get_language_name('es') == 'Spanish'
+            assert lang_ops.get_language_name('zh-cn') == 'Chinese (Simplified)'
+
+            # Test invalid language code
+            assert lang_ops.get_language_name('invalid') is None
+
+            # Test empty language code
+            assert lang_ops.get_language_name('') is None
+
+    def test_terminology_support_validation(self):
+        """Test terminology support validation."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        # Mock the validate_language_pair method to return True for valid pairs
+        with patch.object(lang_ops, 'validate_language_pair') as mock_validate:
+            mock_validate.return_value = True
+
+            # Test terminology support for common language pairs
+            assert lang_ops.is_terminology_supported('en', 'es') is True
+            assert lang_ops.is_terminology_supported('en', 'fr') is True
+
+            # Test auto-detect (should return False)
+            assert lang_ops.is_terminology_supported('auto', 'es') is False
+
+            # Test with invalid language pair
+            mock_validate.return_value = False
+            assert lang_ops.is_terminology_supported('en', 'invalid') is False
+
+    def test_language_metrics_comprehensive(self):
+        """Test comprehensive language metrics functionality."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        # Mock the _retrieve_cloudwatch_metrics method directly
+        mock_metrics_data = {
+            'translation_count': 1000,
+            'character_count': 50000,
+            'average_response_time': 0.5,
+            'error_rate': 0.01,
+        }
+
+        with patch.object(
+            lang_ops, '_retrieve_cloudwatch_metrics', return_value=mock_metrics_data
+        ):
+            metrics = lang_ops.get_language_metrics('en-es', '24h')
+
+            # Test that metrics object has expected attributes
+            assert hasattr(metrics, 'language_pair')
+            assert hasattr(metrics, 'translation_count')
+            assert hasattr(metrics, 'character_count')
+            assert metrics.language_pair == 'en-es'
+            assert metrics.translation_count == 1000
+            assert metrics.character_count == 50000
+
+    def test_language_metrics_error_handling(self):
+        """Test language metrics error handling."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+        from botocore.exceptions import ClientError
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        with patch.object(lang_ops.aws_client_manager, 'get_cloudwatch_client') as mock_cw:
+            # Mock access denied error
+            mock_cw.return_value.get_metric_statistics.side_effect = ClientError(
+                error_response={
+                    'Error': {
+                        'Code': 'AccessDenied',
+                        'Message': 'Access denied to CloudWatch metrics',
+                    }
+                },
+                operation_name='GetMetricStatistics',
+            )
+
+            with pytest.raises(Exception):  # Should raise appropriate error
+                lang_ops.get_language_metrics('en', 'es')
+
+    def test_cache_functionality_edge_cases(self):
+        """Test cache functionality with edge cases."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        # Test cache initialization
+        assert hasattr(lang_ops, '_language_cache')
+        assert hasattr(lang_ops, '_cache_timestamp')
+
+        # Test cache validity check
+        is_valid = lang_ops._is_cache_valid()
+        assert isinstance(is_valid, bool)
+
+    def test_language_pair_format_validation(self):
+        """Test language pair format validation."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        # Mock the list_language_pairs method directly
+        from awslabs.amazon_translate_mcp_server.models import LanguagePair
+
+        mock_pairs = [
+            LanguagePair(
+                source_language='en', target_language='es', supported_formats=['text/plain']
+            ),
+            LanguagePair(
+                source_language='zh-cn', target_language='en', supported_formats=['text/plain']
+            ),
+            LanguagePair(
+                source_language='auto', target_language='fr', supported_formats=['text/plain']
+            ),
+        ]
+
+        with patch.object(lang_ops, 'list_language_pairs', return_value=mock_pairs):
+            # Test valid formats
+            assert lang_ops.validate_language_pair('en', 'es') is True
+            assert lang_ops.validate_language_pair('zh-cn', 'en') is True
+            assert lang_ops.validate_language_pair('auto', 'fr') is True
+
+            # Test invalid formats
+            # Empty strings should raise ValidationError
+            with pytest.raises(ValidationError):
+                lang_ops.validate_language_pair('', 'es')
+            with pytest.raises(ValidationError):
+                lang_ops.validate_language_pair('en', '')
+            # Invalid language codes should return False
+            assert lang_ops.validate_language_pair('invalid', 'es') is False
+            assert lang_ops.validate_language_pair('en', 'invalid') is False
+
+    def test_bulk_language_validation(self):
+        """Test bulk language validation functionality."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        with patch.object(lang_ops, 'list_language_pairs') as mock_get_langs:
+            # Mock language pairs
+            from awslabs.amazon_translate_mcp_server.models import LanguagePair
+
+            mock_get_langs.return_value = [
+                LanguagePair(
+                    source_language='en', target_language='es', supported_formats=['text/plain']
+                ),
+                LanguagePair(
+                    source_language='en', target_language='fr', supported_formats=['text/plain']
+                ),
+                LanguagePair(
+                    source_language='es', target_language='en', supported_formats=['text/plain']
+                ),
+            ]
+
+            # Test language pair validation
+            assert lang_ops.validate_language_pair('en', 'es') is True
+            assert lang_ops.validate_language_pair('en', 'fr') is True
+            assert lang_ops.validate_language_pair('invalid', 'es') is False
+
+    def test_concurrent_cache_access(self):
+        """Test concurrent cache access scenarios."""
+        import threading
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+        from unittest.mock import MagicMock
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        results = []
+
+        def access_cache():
+            try:
+                # Simulate concurrent access to cached data
+                langs = lang_ops.get_supported_languages()
+                results.append(len(langs) if langs else 0)
+            except Exception as e:
+                results.append(str(e))
+
+        # Create multiple threads to access cache concurrently
+        threads = []
+        for _ in range(5):
+            thread = threading.Thread(target=access_cache)
+            threads.append(thread)
+            thread.start()
+
+        # Wait for all threads to complete
+        for thread in threads:
+            thread.join()
+
+        # Should handle concurrent access gracefully
+        assert len(results) == 5
+        # All results should be consistent (either all numbers or all errors)
+        if all(isinstance(r, int) for r in results):
+            assert all(r == results[0] for r in results)
+
+
+class TestLanguageOperationsPerformance:
+    """Test language operations performance and optimization."""
+
+    def test_cache_performance_optimization(self):
+        """Test cache performance optimization."""
+        import time
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+        from unittest.mock import MagicMock
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        with patch.object(lang_ops.aws_client_manager, 'get_translate_client') as mock_client:
+            # Mock expensive API call
+            mock_client.return_value.list_languages.return_value = {
+                'Languages': [
+                    {'LanguageCode': 'en', 'LanguageName': 'English'},
+                    {'LanguageCode': 'es', 'LanguageName': 'Spanish'},
+                ]
+            }
+
+            # First call should hit the API
+            start_time = time.time()
+            langs1 = lang_ops.list_language_pairs()
+            first_call_time = time.time() - start_time
+
+            # Second call should use cache (much faster)
+            start_time = time.time()
+            langs2 = lang_ops.list_language_pairs()
+            second_call_time = time.time() - start_time
+
+            # Results should be identical
+            assert langs1 == langs2
+
+            # Second call should be faster (cached)
+            # Note: This is a rough test, actual timing may vary
+            assert second_call_time <= first_call_time
+
+            # API should only be called once
+            assert mock_client.return_value.list_languages.call_count == 1
+
+    def test_memory_usage_optimization(self):
+        """Test memory usage optimization in language operations."""
+        from awslabs.amazon_translate_mcp_server.language_operations import LanguageOperations
+        from unittest.mock import MagicMock
+
+        mock_aws_client = MagicMock()
+        lang_ops = LanguageOperations(mock_aws_client)
+
+        # Test that cache doesn't grow indefinitely
+        initial_cache_size = len(lang_ops._language_cache) if lang_ops._language_cache else 0
+
+        # Perform multiple operations
+        for _ in range(10):
+            lang_ops.validate_language_pair('en', 'es')
+            lang_ops.get_language_name('en')
+            lang_ops.is_terminology_supported('en', 'es')
+
+        # Cache size should remain reasonable
+        final_cache_size = len(lang_ops._language_cache) if lang_ops._language_cache else 0
+
+        # Should not grow excessively
+        assert final_cache_size <= initial_cache_size + 10  # Reasonable growth limit

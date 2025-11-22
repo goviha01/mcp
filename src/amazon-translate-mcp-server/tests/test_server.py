@@ -1348,3 +1348,184 @@ async def test_list_active_workflows_standard_pattern(mock_context):
     assert result['workflows'][0]['workflow_id'] == 'workflow-123'
     assert result['workflows'][0]['workflow_type'] == 'smart_translation'
     assert result['total_count'] == 1
+
+
+class TestTerminologyImportFunctionality:
+    """Test terminology import functionality and error handling."""
+
+    @pytest.mark.asyncio
+    async def test_import_terminology_service_not_initialized(self):
+        """Test import_terminology when terminology manager is not initialized."""
+        with patch('awslabs.amazon_translate_mcp_server.server.terminology_manager', None):
+            mock_ctx = MagicMock()
+
+            result = await import_terminology(
+                ctx=mock_ctx,
+                name='test-terminology',
+                file_content='dGVzdCBjb250ZW50',  # base64 encoded 'test content'
+                file_format='CSV',
+                description='Test terminology',
+                source_language='en',
+                target_languages=['es'],
+            )
+
+            assert 'error' in result
+            assert 'not initialized' in result['error']
+
+    @pytest.mark.asyncio
+    async def test_import_terminology_success(self):
+        """Test successful terminology import."""
+        with patch(
+            'awslabs.amazon_translate_mcp_server.server.terminology_manager'
+        ) as mock_term_mgr:
+            mock_term_mgr.import_terminology.return_value = (
+                'arn:aws:translate:us-east-1:123456789012:terminology/test-terminology'
+            )
+
+            mock_ctx = MagicMock()
+
+            result = await import_terminology(
+                ctx=mock_ctx,
+                name='test-terminology',
+                file_content='dGVzdCBjb250ZW50',  # base64 encoded 'test content'
+                file_format='CSV',
+                description='Test terminology',
+                source_language='en',
+                target_languages=['es'],
+            )
+
+            assert result['status'] == 'IMPORTED'
+            assert result['name'] == 'test-terminology'
+            assert 'terminology_arn' in result
+
+    @pytest.mark.asyncio
+    async def test_import_terminology_base64_decode_error(self):
+        """Test import_terminology with invalid base64 content."""
+        with patch('awslabs.amazon_translate_mcp_server.server.terminology_manager'):
+            mock_ctx = MagicMock()
+
+            result = await import_terminology(
+                ctx=mock_ctx,
+                name='test-terminology',
+                file_content='invalid-base64!@#',
+                file_format='CSV',
+                description='Test terminology',
+                source_language='en',
+                target_languages=['es'],
+            )
+
+            assert 'error' in result
+            assert 'error_type' in result
+
+
+# Removed TestGetTerminologyFunctionality - function doesn't exist
+
+
+# Removed TestLanguageMetricsFunctionality - function doesn't exist
+
+
+class TestWorkflowManagementFunctionality:
+    """Test workflow management functionality and error handling."""
+
+    @pytest.mark.asyncio
+    async def test_list_active_workflows_service_not_initialized(self):
+        """Test list_active_workflows when workflow orchestrator is not initialized."""
+        with patch('awslabs.amazon_translate_mcp_server.server.workflow_orchestrator', None):
+            mock_ctx = MagicMock()
+
+            result = await list_active_workflows(ctx=mock_ctx)
+
+            assert 'error' in result
+            assert 'not initialized' in result['error']
+
+    @pytest.mark.asyncio
+    async def test_list_active_workflows_success(self):
+        """Test successful active workflows listing."""
+        with patch(
+            'awslabs.amazon_translate_mcp_server.server.workflow_orchestrator'
+        ) as mock_workflow:
+            mock_workflows = [
+                {
+                    'workflow_id': 'wf-123',
+                    'type': 'smart_translation',
+                    'status': 'running',
+                    'created_at': '2023-01-01T12:00:00Z',
+                },
+                {
+                    'workflow_id': 'wf-456',
+                    'type': 'batch_translation',
+                    'status': 'completed',
+                    'created_at': '2023-01-01T11:00:00Z',
+                },
+            ]
+            mock_workflow.list_active_workflows.return_value = mock_workflows
+
+            mock_ctx = MagicMock()
+
+            result = await list_active_workflows(ctx=mock_ctx)
+
+            assert len(result['workflows']) == 2
+            assert result['workflows'][0]['workflow_id'] == 'wf-123'
+
+    @pytest.mark.asyncio
+    async def test_smart_translate_workflow_service_not_initialized(self):
+        """Test smart_translate_workflow when workflow orchestrator is not initialized."""
+        with patch('awslabs.amazon_translate_mcp_server.server.workflow_orchestrator', None):
+            mock_ctx = MagicMock()
+
+            result = await smart_translate_workflow(
+                ctx=mock_ctx, text='Hello world', target_language='es'
+            )
+
+            assert 'error' in result
+            assert 'not initialized' in result['error']
+
+
+class TestBatchTranslationErrorHandling:
+    """Test batch translation error handling scenarios."""
+
+    @pytest.mark.asyncio
+    async def test_start_batch_translation_service_not_initialized(self):
+        """Test start_batch_translation when batch manager is not initialized."""
+        with patch('awslabs.amazon_translate_mcp_server.server.batch_manager', None):
+            mock_ctx = MagicMock()
+
+            result = await start_batch_translation(
+                ctx=mock_ctx,
+                input_s3_uri='s3://bucket/input/',
+                output_s3_uri='s3://bucket/output/',
+                data_access_role_arn='arn:aws:iam::123456789012:role/TranslateRole',
+                source_language='en',
+                target_languages=['es'],
+            )
+
+            assert 'error' in result
+            assert 'not initialized' in result['error']
+
+    @pytest.mark.asyncio
+    async def test_get_translation_job_service_not_initialized(self):
+        """Test get_translation_job when batch manager is not initialized."""
+        with patch('awslabs.amazon_translate_mcp_server.server.batch_manager', None):
+            mock_ctx = MagicMock()
+
+            result = await get_translation_job(ctx=mock_ctx, job_id='job-123')
+
+            assert 'error' in result
+            assert 'not initialized' in result['error']
+
+    @pytest.mark.asyncio
+    async def test_list_translation_jobs_service_not_initialized(self):
+        """Test list_translation_jobs when batch manager is not initialized."""
+        with patch('awslabs.amazon_translate_mcp_server.server.batch_manager', None):
+            mock_ctx = MagicMock()
+
+            result = await list_translation_jobs(ctx=mock_ctx)
+
+            assert 'error' in result
+            assert 'not initialized' in result['error']
+
+
+# Removed TestLanguagePairsFunctionality - function doesn't exist
+
+
+# Removed TestTerminologyListingFunctionality - function doesn't exist

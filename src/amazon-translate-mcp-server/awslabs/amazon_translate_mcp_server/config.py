@@ -165,6 +165,8 @@ def setup_logging(config: ServerConfig):
 
 def validate_aws_config(config: ServerConfig) -> bool:
     """Validate AWS configuration."""
+    from .security_validators import ALLOWED_AWS_REGIONS, validate_aws_region
+
     # Check if we have explicit credentials
     has_explicit_creds = config.aws_access_key_id and config.aws_secret_access_key
 
@@ -182,10 +184,18 @@ def validate_aws_config(config: ServerConfig) -> bool:
             'No explicit AWS credentials found. Relying on IAM roles or instance metadata.'
         )
 
-    # Validate region
+    # Validate region with security whitelist
     if not config.aws_region:
         config.aws_region = 'us-east-1'  # Default region
         logging.info(f'No AWS region specified, using default: {config.aws_region}')
+
+    try:
+        config.aws_region = validate_aws_region(config.aws_region)
+        logging.info(f'AWS region validated: {config.aws_region}')
+    except Exception as e:
+        logging.error(f'AWS region validation failed: {e}')
+        logging.info(f'Allowed regions: {", ".join(sorted(ALLOWED_AWS_REGIONS))}')
+        raise
 
     return True
 

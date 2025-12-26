@@ -397,8 +397,9 @@ class TestMCPToolErrorHandling:
             result = await server.detect_language(ctx=mock_ctx, text='Hello world')
 
             assert 'error' in result
-            assert 'Unexpected error' in result['error']
-            assert result['error_type'] == 'Exception'
+            # The error message is wrapped by normalize_exception
+            assert 'Exception' in result['error'] or 'error occurred' in result['error']
+            assert result['error_type'] in ['Exception', 'TranslateException']
 
 
 class TestMCPToolIntegration:

@@ -303,8 +303,9 @@ class TestAWSConfigValidation:
 
             assert result is True
             assert config.aws_region == 'us-east-1'
-            mock_info.assert_called_once()
-            assert 'using default' in mock_info.call_args[0][0]
+            # Two info calls: one for default region, one for validation
+            assert mock_info.call_count == 2
+            assert 'using default' in mock_info.call_args_list[0][0][0]
 
 
 class TestGlobalConfig:
@@ -507,11 +508,12 @@ class TestConfigAdvancedFeatures:
     def test_config_validation_edge_cases(self):
         """Test configuration validation with edge cases."""
         from awslabs.amazon_translate_mcp_server.config import ServerConfig, validate_aws_config
+        from awslabs.amazon_translate_mcp_server.exceptions import SecurityError
 
-        # Test with invalid region (should not raise exception, just log warning)
+        # Test with invalid region (should raise SecurityError with our new validation)
         invalid_region_config = ServerConfig(aws_region='invalid-region')
-        result = validate_aws_config(invalid_region_config)
-        assert result is True  # Function returns True even for invalid regions
+        with pytest.raises(SecurityError):
+            validate_aws_config(invalid_region_config)
 
         # Test with negative values (ServerConfig validation should handle this)
         with pytest.raises(ValueError):  # Should be caught by ServerConfig.__post_init__

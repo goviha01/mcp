@@ -29,9 +29,11 @@ from .config import load_config_from_env
 from .exceptions import (
     BatchJobError,
     TerminologyError,
+    TranslateException,
     TranslationError,
     ValidationError,
     WorkflowError,
+    map_aws_error,
 )
 from .language_operations import LanguageOperations
 from .logging_config import setup_logging
@@ -39,6 +41,7 @@ from .models import TranslationJobSummary
 from .terminology_manager import TerminologyManager
 from .translation_service import TranslationService
 from .workflow_orchestrator import WorkflowOrchestrator
+from botocore.exceptions import ClientError
 from datetime import datetime
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
@@ -265,6 +268,65 @@ def initialize_services() -> None:
         raise
 
 
+def normalize_exception(e: Exception, correlation_id: Optional[str] = None) -> Dict[str, Any]:
+    """Normalize exceptions to structured error responses.
+
+    This function ensures that all exceptions are properly normalized to prevent
+    leaking internal AWS error details while providing useful error information.
+
+    Args:
+        e: The exception to normalize
+        correlation_id: Optional correlation ID for tracking
+
+    Returns:
+        Structured error response dictionary
+
+    """
+    # If it's already a TranslateException, use its error response
+    if isinstance(e, TranslateException):
+        error_response = e.to_error_response()
+        return {
+            'error': error_response.message,
+            'error_type': error_response.error_type,
+            'error_code': error_response.error_code,
+            'correlation_id': error_response.correlation_id,
+            'timestamp': error_response.timestamp,
+            'details': error_response.details,
+            'retry_after': error_response.retry_after,
+        }
+
+    # If it's an AWS ClientError, map it to a custom exception
+    if isinstance(e, ClientError):
+        mapped_exception = map_aws_error(e, correlation_id)
+        error_response = mapped_exception.to_error_response()
+        return {
+            'error': error_response.message,
+            'error_type': error_response.error_type,
+            'error_code': error_response.error_code,
+            'correlation_id': error_response.correlation_id,
+            'timestamp': error_response.timestamp,
+            'details': error_response.details,
+            'retry_after': error_response.retry_after,
+        }
+
+    # For any other exception, wrap it in a generic TranslateException
+    generic_exception = TranslateException(
+        message=f'An unexpected error occurred: {type(e).__name__}',
+        error_code='INTERNAL_ERROR',
+        details={'original_error_type': type(e).__name__},
+        correlation_id=correlation_id,
+    )
+    error_response = generic_exception.to_error_response()
+    return {
+        'error': error_response.message,
+        'error_type': error_response.error_type,
+        'error_code': error_response.error_code,
+        'correlation_id': error_response.correlation_id,
+        'timestamp': error_response.timestamp,
+        'details': error_response.details,
+    }
+
+
 @mcp.tool()
 async def translate_text(
     ctx: Context,
@@ -305,7 +367,7 @@ async def translate_text(
 
     except Exception as e:
         logger.error(f'Translation failed: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -332,7 +394,7 @@ async def detect_language(
 
     except Exception as e:
         logger.error(f'Language detection failed: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -371,7 +433,7 @@ async def validate_translation(
 
     except Exception as e:
         logger.error(f'Translation validation failed: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -436,7 +498,7 @@ async def start_batch_translation(
 
     except Exception as e:
         logger.error(f'Failed to start batch translation: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -478,7 +540,7 @@ async def get_translation_job(
 
     except Exception as e:
         logger.error(f'Failed to get translation job: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -534,7 +596,7 @@ async def list_translation_jobs(
 
     except Exception as e:
         logger.error(f'Failed to list translation jobs: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -582,7 +644,7 @@ async def list_terminologies(ctx: Context) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f'Failed to list terminologies: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -636,7 +698,7 @@ async def create_terminology(
 
     except Exception as e:
         logger.error(f'Failed to create terminology: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -698,7 +760,7 @@ async def import_terminology(
 
     except Exception as e:
         logger.error(f'Failed to import terminology: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -733,7 +795,7 @@ async def get_terminology(
 
     except Exception as e:
         logger.error(f'Failed to get terminology: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -765,7 +827,7 @@ async def list_language_pairs(ctx: Context) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f'Failed to list language pairs: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -803,7 +865,7 @@ async def get_language_metrics(
 
     except Exception as e:
         logger.error(f'Failed to get language metrics: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 # Workflow Orchestration Tools
@@ -870,7 +932,7 @@ async def smart_translate_workflow(
 
     except Exception as e:
         logger.error(f'Smart translate workflow failed: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -945,7 +1007,7 @@ async def managed_batch_translation_workflow(
 
     except Exception as e:
         logger.error(f'Managed batch translation workflow failed: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 # Separate Batch Translation Tools
@@ -1085,7 +1147,7 @@ async def trigger_batch_translation(
 
     except Exception as e:
         logger.error(f'Failed to trigger batch translation: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -1203,7 +1265,7 @@ async def monitor_batch_translation(
 
     except Exception as e:
         logger.error(f'Failed to monitor batch translation: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -1301,7 +1363,7 @@ async def analyze_batch_translation_errors(
 
     except Exception as e:
         logger.error(f'Failed to analyze batch translation errors: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -1321,7 +1383,7 @@ async def list_active_workflows(ctx: Context) -> Dict[str, Any]:
 
     except Exception as e:
         logger.error(f'Failed to list active workflows: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 @mcp.tool()
@@ -1346,7 +1408,7 @@ async def get_workflow_status(
 
     except Exception as e:
         logger.error(f'Failed to get workflow status: {e}')
-        return {'error': str(e), 'error_type': type(e).__name__}
+        return normalize_exception(e)
 
 
 def health_check() -> Dict[str, Any]:

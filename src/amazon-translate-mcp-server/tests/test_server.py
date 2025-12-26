@@ -941,7 +941,10 @@ async def test_translate_text_service_error(mock_context):
         )
 
     assert 'error' in result
-    assert 'Translation failed' in result['error']
+    # Exception is normalized to prevent leaking internal details
+    assert 'An unexpected error occurred' in result['error']
+    assert result['error_type'] == 'TranslateException'
+    assert 'correlation_id' in result
 
 
 @pytest.mark.asyncio
@@ -980,7 +983,10 @@ async def test_detect_language_service_error(mock_context):
         result = await detect_language(mock_context, text='Hello world')
 
     assert 'error' in result
-    assert 'Detection failed' in result['error']
+    # Exception is normalized to prevent leaking internal details
+    assert 'An unexpected error occurred' in result['error']
+    assert result['error_type'] == 'TranslateException'
+    assert 'correlation_id' in result
 
 
 @pytest.mark.asyncio
@@ -1039,7 +1045,10 @@ async def test_validate_translation_service_error(mock_context):
         )
 
     assert 'error' in result
-    assert 'Validation failed' in result['error']
+    # Exception is normalized to prevent leaking internal details
+    assert 'An unexpected error occurred' in result['error']
+    assert result['error_type'] == 'TranslateException'
+    assert 'correlation_id' in result
 
 
 # Tests for batch translation functions
@@ -1062,7 +1071,8 @@ async def test_start_batch_translation_standard_pattern(mock_context):
 
     # The function returns an error due to validation, so check for error handling
     if 'error' in result:
-        assert 'data_access_role_arn must be a valid IAM role ARN' in result['error']
+        # Error message is normalized, check for error type
+        assert result['error_type'] in ['ValidationError', 'ValueError', 'TranslateException']
     else:
         assert result['job_id'] == 'job-123'
         assert result['status'] == 'SUBMITTED'
@@ -1253,7 +1263,8 @@ async def test_smart_translate_workflow_standard_pattern(mock_context):
 
     # The function returns an error due to async mocking issue, so check for error handling
     if 'error' in result:
-        assert "object MagicMock can't be used in 'await' expression" in result['error']
+        # Error message is normalized, check for error type
+        assert result['error_type'] in ['TypeError', 'TranslateException']
     else:
         assert result['workflow_type'] == 'smart_translation'
         assert result['original_text'] == 'Hello world'

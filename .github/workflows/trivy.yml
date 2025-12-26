@@ -24,7 +24,7 @@ jobs:
     outputs:
       dockerfiles: ${{ steps.find-dockerfiles.outputs.dockerfiles }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - name: Find Dockerfiles
         id: find-dockerfiles
         run: |
@@ -46,7 +46,7 @@ jobs:
     steps:
       - name: Clear Up Space (Agressively) for Trivy Scans that Run Out of Space
         if: contains(toJson('["src/core-mcp-server"]'), matrix.dockerfile)
-        uses: awslabs/mcp/.github/actions/clear-space-ubuntu-latest-agressively@bb62109f04532df81644eb76173ad4f987ab6033
+        uses: awslabs/mcp/.github/actions/clear-space-ubuntu-latest-agressively@20e7472ba2174045f54ffd7ea8a0f5d91aae57db
 
       - name: Get Checkout Depth
         id: checkout-depth
@@ -57,7 +57,7 @@ jobs:
 
       - name: Checkout code
         id: checkout-code
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           lfs: true
           fetch-depth: ${{ steps.checkout-depth.outputs.fetch-depth || '1' }}
@@ -100,6 +100,20 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      - name: Generate Container Software Bill of Materials and Vulnerabilities
+        run: |
+          curl -sSfL https://get.anchore.io/syft | sh -s -- -b /usr/local/bin
+          curl -sSfL https://get.anchore.io/grype | sh -s -- -b /usr/local/bin
+          syft scan "${{ runner.temp }}/image.tar" -o json > "${{ matrix.dockerfile }}/syft-results.json"
+          cat "${{ matrix.dockerfile }}/syft-results.json" | grype | tee "${{ matrix.dockerfile }}/grype.txt"
+          syft convert "${{ matrix.dockerfile }}/syft-results.json" -o cyclonedx-json > "${{ matrix.dockerfile }}/cyclonedx.json"
+          docker run --rm -v $(pwd):/data cyclonedx/cyclonedx-cli convert \
+            --input-file /data/${{ matrix.dockerfile }}/cyclonedx.json \
+            --input-format json \
+            --output-file /data/${{ matrix.dockerfile }}/sbom.csv \
+            --output-format csv
+          cat ${{ matrix.dockerfile }}/sbom.csv
+
       - name: Delete the exported image
         run: |
           rm -r -f "${{ runner.temp }}/image.tar"
@@ -121,6 +135,11 @@ jobs:
         uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: trivy-results-${{ steps.checkout-depth.outputs.image-name }}
-          path: '${{ matrix.dockerfile }}/trivy-results.sarif'
+          path: |
+            ${{ matrix.dockerfile }}/trivy-results.sarif
+            ${{ matrix.dockerfile }}/syft-results.json
+            ${{ matrix.dockerfile }}/sbom.csv
+            ${{ matrix.dockerfile }}/grype.txt
+            ${{ matrix.dockerfile }}/cyclonedx.json
           if-no-files-found: error
           retention-days: 1

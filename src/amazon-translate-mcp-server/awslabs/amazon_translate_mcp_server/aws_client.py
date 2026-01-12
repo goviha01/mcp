@@ -22,6 +22,7 @@ import boto3
 import logging
 import os
 import threading
+from .consts import MCP_SERVER_VERSION
 from .exceptions import (
     AuthenticationError,
     TranslateException,
@@ -89,6 +90,7 @@ class AWSClientManager(LoggerMixin):
             max_pool_connections=max_pool_connections,
             connect_timeout=timeout,
             read_timeout=timeout,
+            user_agent_extra=f'awslabs/mcp/amazon-translate-mcp-server/{MCP_SERVER_VERSION}',
         )
 
         # Thread-safe client cache

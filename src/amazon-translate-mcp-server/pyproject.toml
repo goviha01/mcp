@@ -45,6 +45,7 @@ dependencies = [
     "defusedxml>=0.7.1",
     "starlette>=0.50.0",
     "urllib3>=2.6.0",
+    "authlib>=1.6.6",
 ]
 
 [project.scripts]

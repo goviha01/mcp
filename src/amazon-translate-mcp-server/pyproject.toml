@@ -46,6 +46,7 @@ dependencies = [
     "starlette>=0.50.0",
     "urllib3>=2.6.0",
     "authlib>=1.6.6",
+    "filelock>=3.20.0",
 ]
 
 [project.scripts]

@@ -113,6 +113,17 @@ class TestAWSClientManager:
         # Verify STS call was made for credential validation
         mock_sts_client.get_caller_identity.assert_called_once()
 
+    def test_config_has_user_agent_extra(self, mock_session, mock_sts_client, clean_env):
+        """Test that Config includes user_agent_extra with correct format."""
+        from awslabs.amazon_translate_mcp_server.consts import MCP_SERVER_VERSION
+
+        mock_session.client.return_value = mock_sts_client
+
+        manager = AWSClientManager(region_name='us-east-1')
+
+        expected_user_agent = f'awslabs/mcp/amazon-translate-mcp-server/{MCP_SERVER_VERSION}'
+        assert manager._config.user_agent_extra == expected_user_agent
+
     def test_init_with_environment_variables(self, mock_session, mock_sts_client, clean_env):
         """Test initialization with environment variables."""
         os.environ['AWS_REGION'] = 'eu-west-1'

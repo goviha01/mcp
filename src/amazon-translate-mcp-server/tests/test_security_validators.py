@@ -396,3 +396,46 @@ class TestSecurityIntegration:
         for name, malicious_input, validator in attack_vectors:
             with pytest.raises((SecurityError, ValidationError)):
                 validator(malicious_input)
+
+
+class TestAdditionalCoverage:
+    """Additional tests for edge cases and full coverage."""
+
+    def test_s3_uri_empty(self):
+        """Test rejection of empty S3 URI."""
+        with pytest.raises(ValidationError) as exc_info:
+            validate_s3_uri('')
+        assert 's3_uri' in str(exc_info.value)
+
+    def test_s3_uri_invalid_bucket_format(self):
+        """Test rejection of invalid bucket name format."""
+        # Bucket name starting with invalid character
+        with pytest.raises(SecurityError) as exc_info:
+            validate_s3_uri('s3://-invalid-bucket/file')
+        assert 'Invalid S3 bucket name format' in str(exc_info.value)
+
+    def test_s3_uri_ipv6_ssrf(self):
+        """Test SSRF prevention with IPv6 localhost - caught by bucket validation."""
+        with pytest.raises(SecurityError) as exc_info:
+            validate_s3_uri('s3://::1/file')
+        # IPv6 format fails bucket name validation first
+        assert 'Invalid S3 bucket name format' in str(exc_info.value)
+
+    def test_terminology_name_too_long(self):
+        """Test rejection of terminology name exceeding max length."""
+        long_name = 'a' * 300
+        with pytest.raises(ValidationError) as exc_info:
+            validate_terminology_name(long_name)
+        assert 'exceeds maximum length' in str(exc_info.value)
+
+    def test_s3_uri_with_custom_field_name(self):
+        """Test S3 URI validation with custom field name."""
+        with pytest.raises(ValidationError) as exc_info:
+            validate_s3_uri('', field_name='input_s3_uri')
+        assert 'input_s3_uri' in str(exc_info.value)
+
+    def test_language_code_with_custom_field_name(self):
+        """Test language code validation with custom field name."""
+        with pytest.raises(ValidationError) as exc_info:
+            validate_language_code('', field_name='source_language')
+        assert 'source_language' in str(exc_info.value)

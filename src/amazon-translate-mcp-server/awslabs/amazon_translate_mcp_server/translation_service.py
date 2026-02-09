@@ -536,7 +536,7 @@ class TranslationService:
         # Add jitter to avoid thundering herd
         if self._jitter:
             jitter_amount = delay * 0.1  # 10% jitter
-            delay += random.uniform(-jitter_amount, jitter_amount)
+            delay += random.uniform(-jitter_amount, jitter_amount)  # nosec B311 - not security sensitive
 
         return max(0.1, delay)  # Minimum 100ms delay
 

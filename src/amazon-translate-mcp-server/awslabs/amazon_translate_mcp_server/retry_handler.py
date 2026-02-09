@@ -86,7 +86,7 @@ class RetryConfig:
             # Use server-specified retry_after with some jitter
             delay = float(retry_after)
             if self.jitter:
-                delay += random.uniform(0, min(delay * 0.1, 5.0))
+                delay += random.uniform(0, min(delay * 0.1, 5.0))  # nosec B311 - jitter timing only
             return min(delay, self.max_delay)
 
         # Calculate exponential backoff delay
@@ -94,7 +94,7 @@ class RetryConfig:
 
         # Add jitter to prevent thundering herd
         if self.jitter:
-            delay += random.uniform(0, delay * 0.1)
+            delay += random.uniform(0, delay * 0.1)  # nosec B311 - jitter timing only
 
         return min(delay, self.max_delay)
 

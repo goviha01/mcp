@@ -346,9 +346,9 @@ class BatchJobManager:
             }
 
             logger.debug(
-                'Listed %d translation jobs, next_token: %s',
+                'Listed %d translation jobs, has_more_pages: %s',
                 len(job_summaries),
-                'present' if result['next_token'] else 'none',
+                'yes' if result['next_token'] else 'no',
             )
 
             return result

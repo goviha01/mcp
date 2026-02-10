@@ -20,26 +20,10 @@ Supports CSV and TMX formats with validation and conflict resolution.
 """
 
 import csv
+import defusedxml.ElementTree as ET
 import io
 import logging
 import re
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
-
-
-try:
-    import defusedxml.ElementTree as ET
-except ImportError:
-    # Fallback to standard library with security warning
-    import warnings
-    import xml.etree.ElementTree as ET
-
-    warnings.warn(
-        'defusedxml not available. Using xml.etree.ElementTree which may be vulnerable to XML attacks. '
-        'Install defusedxml for secure XML parsing.',
-        UserWarning,
-    )
-
 from .aws_client import AWSClientManager
 from .models import (
     AuthenticationError,
@@ -53,6 +37,8 @@ from .models import (
     ValidationError,
 )
 from botocore.exceptions import BotoCoreError, ClientError
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Union
 
 
 logger = logging.getLogger(__name__)
